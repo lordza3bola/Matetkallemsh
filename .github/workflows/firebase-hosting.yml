@@ -10,15 +10,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Engine tests
         run: node tests/engine.test.mjs
-      - name: Read project id
-        id: proj
-        run: echo "id=$(node -e "console.log(require('./.firebaserc').projects.default)")" >> "$GITHUB_OUTPUT"
       - name: Publish
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: ${{ steps.proj.outputs.id }}
-          channelId: live
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          set -o pipefail
+          if [ -z "$SA_JSON" ]; then echo "::error::Secret FIREBASE_SERVICE_ACCOUNT is missing"; exit 1; fi
+          printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          PROJECT=$(node -e "console.log(require('./.firebaserc').projects.default)")
+          if npx --yes firebase-tools@latest deploy --only hosting --project "$PROJECT" --non-interactive 2>&1 | tee deploy.log; then
+            echo "::notice::Published to https://$PROJECT.web.app"
+          else
+            grep -iE "error|denied|permission|not found|enable|403|404" deploy.log | head -15 | while read -r line; do echo "::error::$line"; done
+            exit 1
+          fi
