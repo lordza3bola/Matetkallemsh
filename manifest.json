@@ -1,0 +1,17 @@
+{
+  "name": "Matetkallemsh!",
+  "short_name": "Matetkallemsh",
+  "description": "Le3bet el aflam el masreya — etkallem bi2eedak, bas mat2olsh wala kelma.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#C8321F",
+  "theme_color": "#C8321F",
+  "lang": "en",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

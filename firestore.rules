@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isMe(uid) { return signedIn() && request.auth.uid == uid; }
+    function hasAccount() { return signedIn() && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+
+    // Player profiles: anyone signed in can read (name, avatar, stats); only the owner writes.
+    match /players/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isMe(uid) && hasAccount();
+      allow delete: if false;
+      match /games/{gameId} {
+        allow read: if signedIn();
+        allow create: if isMe(uid);
+        allow update, delete: if false;
+      }
+    }
+
+    // Usernames are claimed once, by their owner.
+    match /usernames/{name} {
+      allow read: if signedIn();
+      allow create: if hasAccount() && request.resource.data.uid == request.auth.uid
+                    && name.matches('^[a-z0-9_.]{3,20}$');
+      allow update, delete: if false;
+    }
+
+    // Rooms: guests (anonymous) and accounts can create, join and play.
+    match /rooms/{code} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.host == request.auth.uid;
+      allow update: if signedIn();
+      allow delete: if signedIn() && resource.data.host == request.auth.uid;
+    }
+
+    // Friendships: one doc per pair, id = sorted uids joined by "_".
+    match /friendships/{id} {
+      allow read: if signedIn() && (resource == null || request.auth.uid in resource.data.users);
+      allow create: if hasAccount() && request.resource.data.from == request.auth.uid
+                    && request.auth.uid in request.resource.data.users
+                    && request.resource.data.status == 'pending';
+      allow update: if signedIn() && request.auth.uid == resource.data.to
+                    && request.resource.data.status == 'accepted';
+      allow delete: if signedIn() && request.auth.uid in resource.data.users;
+    }
+
+    // Room invites, sent to a friend.
+    match /invites/{to}/items/{id} {
+      allow read, delete: if isMe(to);
+      allow create: if hasAccount() && request.resource.data.fromUid == request.auth.uid;
+      allow update: if false;
+    }
+  }
+}

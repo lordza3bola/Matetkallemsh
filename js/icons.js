@@ -1,0 +1,28 @@
+// Inline stroke icons (currentColor).
+const s = (d, w = 2.2) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+export const I = {
+  back: s('<path d="M15 18l-6-6 6-6"/>', 2.6),
+  gear: s('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>', 2),
+  phone: s('<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>', 2),
+  phones: s('<rect x="2" y="5" width="8" height="15" rx="2"/><rect x="14" y="3" width="8" height="15" rx="2"/>', 2),
+  users: s('<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 11a3 3 0 1 0 0-6M22 21a6 6 0 0 0-4-5.6"/>', 2),
+  refresh: s('<path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/>', 2.4),
+  search: s('<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>', 2.5),
+  check: s('<path d="M5 12l5 5 9-10"/>', 3.2),
+  x: s('<path d="M6 6l12 12M18 6L6 18"/>', 3),
+  pencil: s('<path d="M12 20h9M16.5 3.5a2.1 2.1 0 1 1 3 3L7 19l-4 1 1-4z"/>', 2.4),
+  trophy: s('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>', 2),
+  bolt: s('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>', 2),
+  lock: s('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', 2),
+  share: s('<path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v14"/>', 2.2),
+  crown: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 18h18l-2-10-5 4-2-7-2 7-5-4z" fill="#F3B62E" stroke="#1F1410" stroke-width="1.5" stroke-linejoin="round"/></svg>',
+  film: s('<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><rect x="4" y="12" width="12" height="8" rx="1"/><path d="M16 15l4-2v6l-4-2"/>', 2),
+  tv: s('<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M8 21h8M12 18v3"/>', 2),
+  curtain: s('<path d="M3 4h18M5 4c0 6 2 10 5 14M19 4c0 6-2 10-5 14M3 20h18"/>', 2),
+  hand: s('<path d="M8 13V5a1.5 1.5 0 0 1 3 0v6M11 11V4a1.5 1.5 0 0 1 3 0v7M14 11V6a1.5 1.5 0 0 1 3 0v8a6 6 0 0 1-6 6h-1a5 5 0 0 1-4-2l-3-4a1.5 1.5 0 0 1 2.4-1.8L8 15"/>', 2),
+  ear: s('<path d="M6 8.5a6 6 0 1 1 12 0c0 4-4 5-4 9a3 3 0 0 1-6 0"/><path d="M12 8.5a2.5 2.5 0 0 1 2.5 2.5"/>', 2),
+  arrow: s('<path d="M4 12h16M4 12l4-4M4 12l4 4"/>', 2),
+  moon: s('<path d="M3 4h18M12 4v4M7 21l5-9 5 9M9.5 16.5h5"/>', 2),
+  out: s('<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>', 2.2),
+  sound: s('<path d="M11 5L6 9H2v6h4l5 4zM15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>', 2),
+};

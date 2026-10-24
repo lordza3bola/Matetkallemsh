@@ -1,0 +1,24 @@
+name: Publish to Firebase Hosting
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Engine tests
+        run: node tests/engine.test.mjs
+      - name: Read project id
+        id: proj
+        run: echo "id=$(node -e "console.log(require('./.firebaserc').projects.default)")" >> "$GITHUB_OUTPUT"
+      - name: Publish
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ steps.proj.outputs.id }}
+          channelId: live
