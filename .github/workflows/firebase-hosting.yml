@@ -27,6 +27,6 @@ jobs:
           if npx --yes firebase-tools@latest deploy --only hosting --project "$PROJECT" --non-interactive 2>&1 | tee deploy.log; then
             echo "::notice::Published to https://$PROJECT.web.app"
           else
-            grep -iE "error|denied|permission|not found|enable|403|404" deploy.log | head -15 | while read -r line; do echo "::error::$line"; done
+            tail -n 25 deploy.log | sed 's/\x1b\[[0-9;]*m//g' | grep -v "^\s*$" | while read -r line; do echo "::error::$line"; done
             exit 1
           fi
