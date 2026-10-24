@@ -23,7 +23,7 @@ jobs:
           if [ -z "$SA_JSON" ]; then echo "::error::Secret FIREBASE_SERVICE_ACCOUNT is missing"; exit 1; fi
           printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
-          PROJECT=$(node -e "console.log(require('./.firebaserc').projects.default)")
+          PROJECT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('.firebaserc','utf8')).projects.default)")
           npx --yes firebase-tools@latest deploy --only hosting --project "$PROJECT" --non-interactive > deploy.log 2>&1
           code=$?
           cat deploy.log
