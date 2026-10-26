@@ -9,11 +9,12 @@ service cloud.firestore {
     match /players/{uid} {
       allow read: if signedIn();
       allow create, update: if isMe(uid) && hasAccount();
-      allow delete: if false;
+      allow delete: if isMe(uid);
       match /games/{gameId} {
         allow read: if signedIn();
         allow create: if isMe(uid);
-        allow update, delete: if false;
+        allow delete: if isMe(uid);
+        allow update: if false;
       }
     }
 
@@ -22,7 +23,8 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create: if hasAccount() && request.resource.data.uid == request.auth.uid
                     && name.matches('^[a-z0-9_.]{3,20}$');
-      allow update, delete: if false;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
+      allow update: if false;
     }
 
     // Rooms: guests (anonymous) and accounts can create, join and play.

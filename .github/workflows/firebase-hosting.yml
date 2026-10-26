@@ -31,3 +31,13 @@ jobs:
           echo "::warning::firebase deploy exit code $code"
           tail -n 20 deploy.log | tr -d '\r' | sed 's/\x1b\[[0-9;]*m//g' | while IFS= read -r l; do [ -n "$l" ] && echo "::error::$l"; done
           exit 1
+      - name: Publish Firestore rules
+        if: always()
+        continue-on-error: true
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
+          export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
+          PROJECT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('.firebaserc','utf8')).projects.default)")
+          npx --yes firebase-tools@latest deploy --only firestore:rules --project "$PROJECT" --non-interactive

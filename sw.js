@@ -1,7 +1,7 @@
 // Matetkallemsh service worker.
 // App files: network first (so a new version shows on the next open), cache as offline fallback.
 // Fonts, the QR library and the Firebase SDK: cache first. Firestore/Auth traffic is never touched.
-const CACHE = 'mk-v3';
+const CACHE = 'mk-v4';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
   './js/app.js', './js/engine.js', './js/titles.js', './js/cloud.js', './js/fx.js', './js/share.js', './js/icons.js', './js/avatar.js', './js/firebase-config.js',

@@ -48,6 +48,7 @@ export function friendlyError(e) {
     'auth/user-not-found': 'Mafeesh 7esab bel email da.',
     'auth/too-many-requests': 'Mo7awlat ktir — estanna shwaya w garrab tany.',
     'auth/network-request-failed': 'Mafeesh internet.',
+    'auth/requires-recent-login': 'Da5al tany w garrab.',
     'auth/operation-not-allowed': 'Tare2et el do5ool di mesh mefa3ala fel Firebase console.',
     'permission-denied': 'Mesh masmoo7 — ragga3 Firestore rules.',
     'unavailable': 'Mafeesh internet dlwa2ty.',
@@ -85,6 +86,21 @@ export async function signIn(email, password) {
   return c.user;
 }
 export async function signOutUser() { await fb.signOut(auth); }
+// Deletes everything the account owns, then the login itself. Asks for the password again (Firebase requires a recent sign-in).
+export async function deleteAccount(password) {
+  const u = auth.currentUser;
+  if (!u || u.isAnonymous) throw new Error('Mafeesh 7esab.');
+  if (u.email) await fb.reauthenticateWithCredential(u, fb.EmailAuthProvider.credential(u.email, password || ''));
+  const uid = u.uid, soft = async f => { try { await f(); } catch (e) { console.warn('delete', e); } };
+  const all = async q => { const s = await fb.getDocs(q); await Promise.all(s.docs.map(d => fb.deleteDoc(d.ref))); };
+  const p = await getPlayer(uid).catch(() => null);
+  await soft(() => all(fb.collection(db, 'players', uid, 'games')));
+  await soft(() => all(fb.query(fb.collection(db, 'friendships'), fb.where('users', 'array-contains', uid))));
+  await soft(() => all(fb.collection(db, 'invites', uid, 'items')));
+  if (p && p.username) await soft(() => fb.deleteDoc(fb.doc(db, 'usernames', p.username)));
+  await soft(() => fb.deleteDoc(fb.doc(db, 'players', uid)));
+  await fb.deleteUser(u);
+}
 export async function resetPassword(email) { await fb.sendPasswordResetEmail(auth, email.trim()); }
 export async function signInGuest() {
   if (auth.currentUser) return auth.currentUser;

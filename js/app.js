@@ -8,7 +8,7 @@ import { shareGame } from './share.js';
 import { I } from './icons.js';
 import { avatarInner, HEADS, randomHead, teamBadge, TEAM_ICONS, TEAM_DEFAULT, makeSticker, teamPhoto } from './avatar.js';
 
-export const APP_VERSION = 'V2';
+export const APP_VERSION = 'V3';
 
 // ---------- small helpers ----------
 const $ = sel => document.querySelector(sel);
@@ -133,10 +133,11 @@ SCREENS.home = () => {
       <div class="inrow">
         <input id="joincode" class="input code" maxlength="4" autocomplete="off" autocapitalize="characters" placeholder="4K7Q" value="${esc(S.joinCode)}" data-model="joinCode">
         <button class="btn ink" data-act="join">Od5ol</button>
+        <button class="btn must" data-act="scanRoom" aria-label="Scan QR el oda">Scan</button>
       </div>
-      <p class="note">Aw scan el QR men camera el telefon.</p>
+      <p class="note">Aw dous Scan w sawwar el QR elly 3and so7abak.</p>
     </div>
-    ${standalone() ? '' : `<button class="btn" data-act="installApp">${I.phone.replace('<svg', '<svg width="18" height="18"')} Nazzel el app 3al home screen</button>`}
+    <button class="btn" data-act="installApp">${I.phone.replace('<svg', '<svg width="18" height="18"')} ${standalone() ? 'QR el app le so7abak' : 'Nazzel el app 3al home screen'}</button>
     ${last ? `<div class="hrow" style="margin-top:auto;border-top:2px dashed var(--ink);padding-top:12px;font:500 14px var(--body)">
       <span>Akher le3ba: <b>${esc(last.a)} ${esc(last.as)}</b> – ${esc(last.bs)} ${esc(last.b)}</span></div>` : ''}
   </div></div>`;
@@ -281,6 +282,7 @@ SCREENS.lobby = () => {
       </div>
     </div>
     <p class="note">Kol wa7ed yescan el QR aw yekteb el code · lazem kollo 3ando internet.</p>
+    ${!standalone() && isIOS() ? `<div class="card pad note" style="border-style:dashed;color:var(--ink)">3andak el app 3al home screen? Efta7o w dous <b>Scan</b> aw ekteb el code <b>${esc(S.roomCode)}</b> — link el oda 3al iPhone dayman beyefta7 Safari.</div>` : ''}
     <div class="hrow"><span class="h">El la3eeba</span>${host ? `<button class="chip on must" data-act="roomRandom">Wazza3 3ashwa2y</button>` : ''}</div>
     <div class="grid2">${r.teams.map((t, i) => `
       <div class="team">
@@ -624,6 +626,7 @@ SCREENS.profile = () => {
       <button class="btn red cta" data-act="login">E3mel 7esab aw da5ol</button>
       ${m ? `<button class="btn" data-act="editGuest">Ghayyar esmak aw lonak</button>` : ''}
       ${prefsCard(p)}
+      ${m ? `<button class="link" style="color:var(--red2)" data-act="delAsk">Emsa7 bayanaty men el telefon</button>` : ''}
       <p class="note center">Matetkallemsh ${APP_VERSION}</p>
     </div></div>`;
   }
@@ -661,6 +664,7 @@ SCREENS.profile = () => {
     <div class="hrow"><span class="h">Akher le3ab</span><button class="btn sm" data-act="friends">${I.users.replace('<svg', '<svg width="16" height="16"')} El so7ab</button></div>
     <div class="card list">${S.recent.map(r => `<div class="row" style="font-size:14px"><b style="width:44px;color:${r.won === true ? 'var(--green-ink)' : r.won === false ? 'var(--red2)' : 'var(--muted)'}">${r.won === true ? 'KESB' : r.won === false ? '5ESR' : '='}</b><span class="grow">${esc(r.teams[0].name)} ${r.teams[0].score} – ${r.teams[1].score} ${esc(r.teams[1].name)}</span><span class="sub">${new Date(r.at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span></div>`).join('') || '<div class="row note">Lessa mal3ebtesh</div>'}</div>
     ${prefsCard(p)}
+    <button class="link" style="color:var(--red2)" data-act="delAsk">Emsa7 el 7esab</button>
     <p class="note center">Matetkallemsh ${APP_VERSION}</p>
   </div></div>`;
 };
@@ -733,20 +737,32 @@ function overlays() {
     const url = location.origin + location.pathname + '?install=1', qr = qrSvg(url), ios = isIOS();
     h += `<div class="overlay" data-act="closeSheet"><div class="sheet" data-stop>
       <div class="hrow"><span class="h">Nazzel el app</span><button class="iconbtn" data-act="closeSheet" aria-label="E2fel">${I.x}</button></div>
-      ${ios ? '' : (qr ? `<div class="qr" role="img" aria-label="QR code el app">${qr}</div><p class="note center">Scan men camera el iPhone — hayefta7 el le3ba fe Safari.</p>` : '')}
+      ${S.installEvt ? `<button class="btn red cta" data-act="doInstall">Nazzel dlwa2ty</button>` : ''}
+      ${qr ? `<div class="qr" style="align-self:center" role="img" aria-label="QR code el app">${qr}</div><p class="note center">${standalone() ? 'Wareeh le so7abak: yescanoh men camera el telefon' : 'Scan men camera el telefon'} — yefta7 safhet el tanzeel.</p>` : ''}
+      ${ios || !S.installEvt ? `<span class="h" style="font-size:16px">3al iPhone</span>
       <div class="card list">
         <div class="row"><b>1</b><span class="grow">Efta7 el link fe <b>Safari</b></span></div>
         <div class="row"><b>2</b><span class="grow">Dous zorar <b>Share</b> (el morabba3 bel sahm)</span></div>
         <div class="row"><b>3</b><span class="grow">E5tar <b>Add to Home Screen</b> → Add</span></div>
-      </div>
+      </div>` : ''}
       <p class="note">El iPhone mabyesma7sh le ay website yenazzel nafso automatic — lazem el 3 5atawat dol marra wa7da bas.</p>
-      ${ios ? '' : '<p class="note">Android/Chrome: men el menu e5tar Install app.</p>'}
+      ${!ios && !S.installEvt ? '<p class="note">Android/Chrome: men el menu (⋮) e5tar Install app.</p>' : ''}
     </div></div>`;
   }
   if (S.ui.sheet === 'signs') {
     h += `<div class="overlay" data-act="closeSheet"><div class="sheet" data-stop>
       <div class="hrow"><span class="h">Esharat el aflam</span><button class="iconbtn" data-act="closeSheet" aria-label="E2fel">${I.x}</button></div>
       ${signsGrid()}<p class="note">Ebda2 dayman bel no3 (film, mosalsal, masra7eya) w 3adad el kalemat.</p></div></div>`;
+  }
+  if (S.ui.sheet === 'delAcc') {
+    const acc = !!S.user;
+    h += `<div class="overlay" data-act="closeSheet"><div class="sheet" data-stop>
+      <span class="h">${acc ? 'Emsa7 el 7esab?' : 'Emsa7 bayanatak?'}</span>
+      <p class="note" style="color:var(--ink)">${acc ? 'Hanemsa7 el 7esab, el username, el stats, el so7ab w el da3awat. Mafeesh rogoo3.' : 'Hanemsa7 esmak, sortak w ay le3ba metsagela 3al telefon da.'}</p>
+      ${acc ? `<div class="field"><label for="del-pass">Ekteb el password lel ta2keed</label><input id="del-pass" class="input" type="password" autocomplete="current-password" value="${esc(S.ui.delpass || '')}" data-model="ui.delpass"></div>` : ''}
+      ${S.ui.err ? `<div class="err" role="alert">${esc(S.ui.err)}</div>` : ''}
+      <button class="btn red cta" data-act="delAccount" ${S.ui.busy ? 'disabled' : ''}>${S.ui.busy ? 'Bnemsa7…' : 'Aywa, emsa7'}</button>
+      <button class="btn" data-act="closeSheet">La2</button></div></div>`;
   }
   if (S.ui.sheet === 'foul') {
     h += `<div class="overlay" data-act="closeSheet"><div class="sheet" data-stop>
@@ -915,6 +931,18 @@ A.editProfile = () => { S.ui.editProfile = true; S.ui.pname = S.user.name; S.ui.
 A.saveProfile = async () => {
   const name = (S.ui.pname || '').trim(); if (!name) return;
   try { await C.updatePlayer(S.user.uid, { name, color: S.ui.pcolor || S.user.color }); S.ui.editProfile = false; } catch (e) { toast(C.friendlyError(e)); }
+};
+A.delAsk = () => { S.ui.err = ''; S.ui.delpass = ''; S.ui.busy = false; S.ui.sheet = 'delAcc'; render(); };
+A.delAccount = async () => {
+  if (S.user) {
+    if (!S.ui.delpass) { S.ui.err = 'Ekteb el password.'; return render(); }
+    S.ui.busy = true; S.ui.err = ''; render();
+    try { await C.deleteAccount(S.ui.delpass); } catch (e) { S.ui.busy = false; S.ui.err = C.friendlyError(e); return render(); }
+    S.user = null;
+  }
+  ['mk_guest', 'mk_game', 'mk_setup', 'mk_last', 'mk_room', 'mk_seen'].forEach(k => save(k, null));
+  S.guest = null; S.game = null; S.ui.busy = false; S.ui.delpass = ''; S.ui.sheet = null;
+  toast('Etmasa7.'); go('home');
 };
 A.pref = d => { S.prefs[d.k] = !S.prefs[d.k]; save('mk_prefs', S.prefs); setPrefs(S.prefs); render(); };
 
@@ -1147,7 +1175,7 @@ A.roomStart = () => roomUpdate(room => {
 });
 A.shareRoom = async () => {
   const link = `${location.origin}${location.pathname}?room=${S.roomCode}`;
-  const text = `Ta3ala el3ab Matetkallemsh! Code el oda: ${S.roomCode}`;
+  const text = `Ta3ala el3ab Matetkallemsh! Code el oda: ${S.roomCode} (law el app 3andak: efta7o w dous Scan aw ekteb el code)`;
   try { if (navigator.share) return await navigator.share({ text, url: link }); } catch { return; }
   window.open('https://wa.me/?text=' + encodeURIComponent(text + ' ' + link), '_blank');
 };
@@ -1221,6 +1249,70 @@ async function onTeamFile(i, file) {
   render();
 }
 A.installApp = () => { S.ui.sheet = 'install'; render(); };
+A.doInstall = async () => {
+  const e = S.installEvt; if (!e) return;
+  S.installEvt = null; S.ui.sheet = null; render();
+  try { e.prompt(); await e.userChoice; } catch {}
+};
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); S.installEvt = e; if (S.ui.sheet === 'install' || S.screen === 'home') render(); });
+window.addEventListener('appinstalled', () => { S.installEvt = null; toast('El app etnazzelet — efta7ha men el home screen.'); });
+
+// ----- scan a room QR from inside the app (links from the camera always open the browser on iPhone) -----
+let scan = null;
+function roomFromText(t) {
+  const s = String(t || '').trim();
+  const m = s.match(/[?&]room=([A-Za-z0-9]{4})\b/) || s.match(/^([A-Za-z0-9]{4})$/);
+  return m ? m[1].toUpperCase() : '';
+}
+function loadScript(src) {
+  return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('script')); document.head.appendChild(s); });
+}
+function stopScan() {
+  if (!scan) return;
+  cancelAnimationFrame(scan.raf);
+  if (scan.stream) scan.stream.getTracks().forEach(t => t.stop());
+  scan.el.remove(); scan = null;
+}
+A.scanClose = () => stopScan();
+A.scanRoom = async () => {
+  if (scan) return;
+  const el = document.createElement('div');
+  el.className = 'scanov';
+  el.innerHTML = `<div class="scanbox"><video playsinline muted></video><i></i></div>
+    <p>Sawwar el QR elly 3and so7abak</p><button class="btn cta" data-act="scanClose">E2fel</button>`;
+  document.body.appendChild(el);
+  scan = { el, raf: 0, stream: null };
+  try {
+    const [stream] = await Promise.all([
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }),
+      window.jsQR ? null : loadScript('https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js'),
+    ]);
+    if (!scan) { stream.getTracks().forEach(t => t.stop()); return; }
+    scan.stream = stream;
+    const v = el.querySelector('video'); v.srcObject = stream; await v.play();
+    const c = document.createElement('canvas'), x = c.getContext('2d', { willReadFrequently: true });
+    let warned = 0;
+    const loop = () => {
+      if (!scan) return;
+      if (v.readyState >= 2 && v.videoWidth) {
+        const k = Math.min(1, 640 / v.videoWidth);
+        c.width = Math.round(v.videoWidth * k); c.height = Math.round(v.videoHeight * k);
+        x.drawImage(v, 0, 0, c.width, c.height);
+        const r = window.jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: 'dontInvert' });
+        if (r && r.data) {
+          const code = roomFromText(r.data);
+          if (code) { sfx.tap(); stopScan(); joinRoom(code); return; }
+          if (Date.now() - warned > 3000) { warned = Date.now(); toast('Da mesh QR oda — sawwar el QR elly fel oda.'); }
+        }
+      }
+      scan.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) {
+    stopScan();
+    toast('El camera mesh shaghala — ekteb el code bta3 el oda.');
+  }
+};
 A.shareApp = async () => {
   const text = 'Ta3ala el3ab Matetkallemsh — le3bet el aflam el masreya!';
   try { if (navigator.share) return await navigator.share({ text, url: location.origin }); } catch { return; }
