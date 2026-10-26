@@ -169,7 +169,7 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
 .sa7:active { transform: translate(2px, 2px); }
 
 /* score / podium */
-.podium { display: flex; align-items: flex-end; justify-content: center; gap: 14px; height: 196px; margin-top: 8px; }
+.podium { display: flex; align-items: flex-end; justify-content: center; gap: 14px; height: 226px; margin-top: 8px; }
 .col { width: 124px; border: 3px solid var(--ink); border-bottom: none; border-radius: 16px 16px 0 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
 .col .n { font: 400 60px/1 var(--display); text-shadow: 3px 3px 0 var(--ink); }
 .col .nm { font: 700 15px var(--body); padding: 0 6px; text-align: center; }
@@ -208,3 +208,29 @@ input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer
 .spacer { flex: 1; }
 .qr svg { width: 116px; height: 116px; display: block; }
 .qr { flex: none; background: #fff; border: 2px solid var(--ink); border-radius: 10px; padding: 4px; }
+
+/* avatars — big-head stickers (players) */
+.av.has { background: transparent !important; border: none; overflow: visible; }
+.stk { width: 112%; height: 112%; display: block; flex: none; object-fit: contain; filter: drop-shadow(2px 3px 0 rgba(31,20,16,.4)); }
+span.stk { filter: drop-shadow(0 0 0 #fff) drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff) drop-shadow(2px 3px 0 rgba(31,20,16,.4)); }
+.stk svg { width: 100%; height: 100%; display: block; }
+.avgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 10px; }
+.avopt { aspect-ratio: 1; border: 2px solid transparent; border-radius: 16px; background: var(--paper); display: flex; align-items: center; justify-content: center; padding: 8px; }
+.avopt.on { border-color: var(--ink); background: var(--must); }
+.avopt.up { border: 2px dashed var(--ink); font: 700 12px/1.2 var(--body); text-align: center; flex-direction: column; gap: 4px; position: relative; }
+.avopt.up input, .tb.up input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.pchip .av { width: 26px; height: 26px; font-size: 11px; border-width: 1.5px; }
+.pchip .avbtn { padding: 0; border: none; background: none; display: flex; }
+
+/* team badges — cinema stamps */
+.tb { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 2.5px solid var(--ink); position: relative; display: inline-flex; align-items: center; justify-content: center; overflow: hidden; padding: 0; min-height: 0; }
+.tb::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; border: 1.5px dashed rgba(31,20,16,.55); pointer-events: none; }
+.tb svg { width: 64%; height: 64%; }
+.tb img { width: 100%; height: 100%; object-fit: cover; filter: grayscale(1) contrast(1.35); mix-blend-mode: multiply; }
+.tb .ht { position: absolute; inset: 0; background: radial-gradient(circle, rgba(31,20,16,.35) 1px, transparent 1.4px) 0 0/4px 4px; }
+.tb.sm { width: 28px; height: 28px; border-width: 2px; }
+.tb.lg { width: 58px; height: 58px; border-width: 3px; }
+.tb.pick { width: 34px; height: 34px; opacity: .55; }
+.tb.pick.on { opacity: 1; outline: 3px solid var(--ink); outline-offset: 1px; }
+.tb.up { border-style: dashed; background: transparent !important; font: 700 9px/1 var(--body); text-align: center; opacity: 1; }
+.tbrow { display: flex; flex-wrap: wrap; gap: 6px; }

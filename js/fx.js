@@ -1,7 +1,7 @@
-// Sounds (generated with WebAudio, no files), vibration, confetti and screen wake lock.
+// Sounds (generated with WebAudio, no files), confetti and screen wake lock.
 
 let ctx = null;
-const prefs = { sound: true, vibrate: true };
+const prefs = { sound: true };
 
 export function setPrefs(p) { Object.assign(prefs, p); }
 export function getPrefs() { return { ...prefs }; }
@@ -10,13 +10,36 @@ function ac() {
   if (!prefs.sound) return null;
   try {
     if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
+    if (ctx.state !== 'running') ctx.resume().catch(() => {});
     return ctx;
   } catch { return null; }
 }
 
-// iOS only allows audio after a tap: call once from any tap handler.
-export function unlockAudio() { ac(); }
+// iOS only allows audio after a tap, and mutes WebAudio when the silent switch is on.
+// Call from tap handlers: plays a silent buffer + a silent <audio> so iOS uses the "playback" session.
+let unlocked = false, silentEl = null;
+export function unlockAudio() {
+  const c = ac(); if (!c) return;
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch {}
+  if (unlocked && c.state === 'running') return;
+  try { const b = c.createBuffer(1, 1, 22050), s = c.createBufferSource(); s.buffer = b; s.connect(c.destination); s.start(0); } catch {}
+  try {
+    if (!silentEl) {
+      silentEl = new Audio(silentWav()); silentEl.loop = true; silentEl.setAttribute('playsinline', ''); silentEl.volume = 0.01;
+    }
+    const p = silentEl.play(); if (p) p.catch(() => {});
+  } catch {}
+  unlocked = true;
+}
+function silentWav() {
+  const n = 800, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) v.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); v.setUint32(4, 36 + n, true); w(8, 'WAVE'); w(12, 'fmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 1, true); v.setUint32(24, 8000, true); v.setUint32(28, 8000, true);
+  v.setUint16(32, 1, true); v.setUint16(34, 8, true); w(36, 'data'); v.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) v.setUint8(44 + i, 128);
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
 
 function tone(freq, start, dur, type = 'square', vol = 0.12) {
   const c = ac(); if (!c) return;
@@ -40,21 +63,17 @@ export const sfx = {
   },
   tick() { tone(1200, 0, 0.04, 'square', 0.05); },
   lastTick() { tone(1500, 0, 0.07, 'square', 0.08); },
-  correct() { [523, 659, 784, 1046].forEach((f, i) => tone(f, i * 0.09, 0.18, 'triangle', 0.14)); vibrate([40, 40, 80]); },
-  buzzer() { tone(140, 0, 0.6, 'sawtooth', 0.16); tone(110, 0.05, 0.6, 'sawtooth', 0.12); vibrate([300]); },
-  foul() { [0, 0.18, 0.36].forEach(t => tone(880, t, 0.12, 'square', 0.14)); vibrate([80, 60, 80, 60, 80]); },
+  correct() { [523, 659, 784, 1046].forEach((f, i) => tone(f, i * 0.09, 0.18, 'triangle', 0.14)); },
+  buzzer() { tone(140, 0, 0.6, 'sawtooth', 0.16); tone(110, 0.05, 0.6, 'sawtooth', 0.12); },
+  foul() { [0, 0.18, 0.36].forEach(t => tone(880, t, 0.12, 'square', 0.14)); },
   help() { tone(880, 0, 0.08, 'triangle', 0.1); tone(1320, 0.08, 0.12, 'triangle', 0.1); },
   win() {
     const notes = [523, 523, 523, 659, 784, 659, 784, 1046];
     notes.forEach((f, i) => tone(f, i * 0.13, 0.2, 'triangle', 0.14));
-    vibrate([60, 40, 60, 40, 160]);
+   
   },
 };
 
-export function vibrate(p) {
-  if (!prefs.vibrate) return;
-  try { navigator.vibrate && navigator.vibrate(p); } catch {}
-}
 
 // ---------- confetti ----------
 export function confetti(colors = ['#C8321F', '#F3B62E', '#1F5F7A', '#5B8C3A', '#FFF8EA']) {

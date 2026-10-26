@@ -6,8 +6,9 @@ import { FIREBASE_CONFIG } from './firebase-config.js';
 import { sfx, unlockAudio, confetti, keepAwake, setPrefs, getPrefs } from './fx.js';
 import { shareGame } from './share.js';
 import { I } from './icons.js';
+import { avatarInner, HEADS, randomHead, teamBadge, TEAM_ICONS, TEAM_DEFAULT, makeSticker, teamPhoto } from './avatar.js';
 
-export const APP_VERSION = 'V1';
+export const APP_VERSION = 'V2';
 
 // ---------- small helpers ----------
 const $ = sel => document.querySelector(sel);
@@ -18,7 +19,8 @@ const uid8 = () => Math.random().toString(36).slice(2, 10);
 const COLORS = ['#C8321F', '#1F5F7A', '#F3B62E', '#5B8C3A', '#7A4E9C', '#E07A2E'];
 const onColor = c => (['#F3B62E', '#E07A2E'].includes(c) ? '#1F1410' : '#FFF8EA');
 const initial = n => (String(n || '?').trim()[0] || '?').toUpperCase();
-const av = (name, color, cls = '') => `<span class="av ${cls}" style="background:${color || '#1F5F7A'};color:${onColor(color || '#1F5F7A')}">${esc(initial(name))}</span>`;
+const av = (name, color, cls = '', a = '') => { const inner = avatarInner(a, name); return inner ? `<span class="av has ${cls}">${inner}</span>` : avInit(name, color, cls); };
+const avInit = (name, color, cls = '') => `<span class="av ${cls}" style="background:${color || '#1F5F7A'};color:${onColor(color || '#1F5F7A')}">${esc(initial(name))}</span>`;
 const fmt = ms => { const s = Math.ceil(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const titleSize = t => (t.length > 22 ? 'xl' : t.length > 12 ? 'l' : '');
 const typeLabel = k => E.TYPE_LABEL[k] || k || '';
@@ -31,7 +33,7 @@ const S = {
   user: null,                 // signed-in account {uid, name, color, username, email, stats, account:true}
   authUid: null,              // any Firebase uid (account or anonymous guest)
   guest: load('mk_guest'),    // {name, color}
-  prefs: load('mk_prefs', { sound: true, vibrate: true }),
+  prefs: load('mk_prefs', { sound: true }),
   setup: null,
   game: load('mk_game'),      // local (one-phone) game in progress
   mode: 'local',
@@ -47,8 +49,8 @@ const S = {
 setPrefs(S.prefs);
 
 function me() {
-  if (S.user) return { id: S.user.uid, name: S.user.name, color: S.user.color, account: true };
-  if (S.guest) return { id: S.authUid || 'guest', name: S.guest.name, color: S.guest.color, account: false };
+  if (S.user) return { id: S.user.uid, name: S.user.name, color: S.user.color, av: S.user.av || '', account: true };
+  if (S.guest) return { id: S.authUid || 'guest', name: S.guest.name, color: S.guest.color, av: S.guest.av || '', account: false };
   return null;
 }
 function myId() { return S.user ? S.user.uid : S.authUid; }
@@ -103,7 +105,7 @@ SCREENS.home = () => {
   return `<div class="screen"><div class="body" style="gap:18px;padding-top:20px">
     <div class="hrow" style="align-items:center">
       <button class="btn" style="border-radius:999px;padding:6px 14px 6px 6px;gap:10px" data-act="${m ? 'profile' : 'login'}">
-        ${m ? av(m.name, m.color) : av('?', '#6B5444')}<span>${m ? 'Ahlan, ' + esc(m.name) : 'Da5ol aw el3ab ka guest'}</span>
+        ${m ? av(m.name, m.color, '', m.av) : av('?', '#6B5444')}<span>${m ? 'Ahlan, ' + esc(m.name) : 'Da5ol aw el3ab ka guest'}</span>
       </button>
       <button class="iconbtn" data-act="profile" aria-label="El e3dadat">${I.gear}</button>
     </div>
@@ -134,6 +136,7 @@ SCREENS.home = () => {
       </div>
       <p class="note">Aw scan el QR men camera el telefon.</p>
     </div>
+    ${standalone() ? '' : `<button class="btn" data-act="installApp">${I.phone.replace('<svg', '<svg width="18" height="18"')} Nazzel el app 3al home screen</button>`}
     ${last ? `<div class="hrow" style="margin-top:auto;border-top:2px dashed var(--ink);padding-top:12px;font:500 14px var(--body)">
       <span>Akher le3ba: <b>${esc(last.a)} ${esc(last.as)}</b> – ${esc(last.bs)} ${esc(last.b)}</span></div>` : ''}
   </div></div>`;
@@ -153,6 +156,7 @@ SCREENS.login = () => {
     ${guestMode ? `
       <div class="field"><label for="g-name">Esmak</label><input id="g-name" class="input" maxlength="16" placeholder="Omar" value="${esc(S.ui.gname || (S.guest && S.guest.name) || '')}" data-model="ui.gname"></div>
       <div class="field"><span class="lbl">El lon bta3ak</span>${swatches('ui.color', color)}</div>
+      <div class="field"><span class="lbl">Sortak</span><button class="btn" style="justify-content:flex-start;gap:12px" data-act="avatarAsk" data-k="me">${av(S.ui.gname || '?', color, '', S.ui.gav || (S.guest && S.guest.av))}<span>E5tar wesh aw nazzel sora</span></button></div>
       <button class="btn must cta" data-act="guestGo">EL3AB</button>
       <button class="link" data-act="loginTab" data-v="in">Rage3 — 3andi 7esab</button>
     ` : `
@@ -189,10 +193,10 @@ function newSetup(online) {
     { name: 'El Asad', color: COLORS[0], players: [] },
     { name: 'El Nesr', color: COLORS[1], players: [] },
   ];
-  teams = teams.map(t => ({ ...t, players: online ? [] : (t.players || []) }));
+  teams = teams.map((t, i) => ({ ...t, icon: t.icon || TEAM_DEFAULT[i], players: online ? [] : (t.players || []).map(p => ({ ...p, av: p.av || randomHead() })) }));
   if (!online && m && !teams.some(t => t.players.some(p => p.id === m.id))) {
     teams.forEach(t => { t.players = t.players.filter(p => !p.me); });
-    teams[0].players.unshift({ id: m.id, name: m.name, me: true });
+    teams[0].players.unshift({ id: m.id, name: m.name, me: true, av: m.av || randomHead() });
   }
   S.setup = { online, settings, teams, add: ['', ''] };
 }
@@ -243,11 +247,12 @@ SCREENS.setup = () => {
 
 function teamCard(t, i, st) {
   return `<div class="team" style="box-shadow:3px 3px 0 ${t.color}">
-    <div class="tname"><span class="dot" style="background:${t.color}"></span><input id="tname${i}" value="${esc(t.name)}" maxlength="14" data-model="setup.teams.${i}.name" aria-label="Esm el fare2"></div>
+    <div class="tname">${teamBadge(t.icon, t.color, 'sm')}<input id="tname${i}" value="${esc(t.name)}" maxlength="14" data-model="setup.teams.${i}.name" aria-label="Esm el fare2"></div>
     <div class="tbody">
+      <div class="tbrow">${Object.keys(TEAM_ICONS).map(k => `<button class="tb pick ${t.icon === k ? 'on' : ''}" style="background:${t.color}" data-act="teamIcon" data-i="${i}" data-v="${k}" aria-label="Shi3ar el fare2">${TEAM_ICONS[k]}</button>`).join('')}<label class="tb pick up ${t.icon && t.icon.startsWith('data:') ? 'on' : ''}">${t.icon && t.icon.startsWith('data:') ? `<img src="${t.icon}" alt="">` : '+ Sora'}<input type="file" accept="image/*" data-teamfile="${i}" aria-label="Sora lel fare2"></label></div>
       <div class="swatches">${COLORS.map(c => `<button class="sw ${c === t.color ? 'on' : ''}" style="background:${c}" data-act="teamColor" data-i="${i}" data-v="${c}" aria-label="Lon el fare2"></button>`).join('')}</div>
       ${!st.online ? `
-        <div class="chips" style="gap:4px">${t.players.map(p => `<span class="pchip">${esc(p.name)}<button data-act="removePlayer" data-i="${i}" data-id="${esc(p.id)}" aria-label="Shil ${esc(p.name)}">×</button></span>`).join('') || '<span class="note">Mafeesh la3eeba lessa</span>'}</div>
+        <div class="chips" style="gap:4px">${t.players.map(p => `<span class="pchip" style="padding-left:2px"><button class="avbtn" data-act="avatarAsk" data-k="player" data-i="${i}" data-id="${esc(p.id)}" aria-label="Sora ${esc(p.name)}">${av(p.name, t.color, '', p.av)}</button>${esc(p.name)}<button data-act="removePlayer" data-i="${i}" data-id="${esc(p.id)}" aria-label="Shil ${esc(p.name)}">×</button></span>`).join('') || '<span class="note">Mafeesh la3eeba lessa</span>'}</div>
         <div class="inrow"><input id="add${i}" class="input" style="height:38px;font-size:14px;padding:0 10px" maxlength="14" placeholder="+ La3eb" value="${esc(st.add[i])}" data-model="setup.add.${i}" data-enter="addPlayer" data-i="${i}">
         <button class="btn sm" data-act="addPlayer" data-i="${i}" aria-label="Zawwed">+</button></div>` : `<p class="note">Hayetmeli fel oda</p>`}
     </div></div>`;
@@ -279,10 +284,10 @@ SCREENS.lobby = () => {
     <div class="hrow"><span class="h">El la3eeba</span>${host ? `<button class="chip on must" data-act="roomRandom">Wazza3 3ashwa2y</button>` : ''}</div>
     <div class="grid2">${r.teams.map((t, i) => `
       <div class="team">
-        <button class="tname" style="background:${t.color};color:${onColor(t.color)};border:none;border-bottom:2px solid var(--ink);text-align:left;width:100%" data-act="joinTeam" data-i="${i}">${esc(t.name)}<span style="margin-left:auto;font:600 11px var(--body)">${players.find(p => p.id === uid && p.team === i) ? 'enta hena' : 'od5ol'}</span></button>
-        <div class="tbody">${players.filter(p => p.team === i).map(p => `<span style="display:flex;align-items:center;gap:8px;font-size:14px">${av(p.name, p.color)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</span>${p.id === r.host ? '<span class="stamp ink" style="font-size:10px;padding:1px 4px">HOST</span>' : ''}${host && p.id !== uid ? `<button class="btn sm" style="min-height:30px;padding:0 6px" data-act="movePlayer" data-id="${esc(p.id)}" data-i="${1 - i}" aria-label="Na2alo">⇄</button>` : ''}</span>`).join('') || '<span class="note">Fadi</span>'}</div>
+        <button class="tname" style="background:${t.color};color:${onColor(t.color)};border:none;border-bottom:2px solid var(--ink);text-align:left;width:100%" data-act="joinTeam" data-i="${i}">${teamBadge(t.icon, t.color, 'sm')}${esc(t.name)}<span style="margin-left:auto;font:600 11px var(--body)">${players.find(p => p.id === uid && p.team === i) ? 'enta hena' : 'od5ol'}</span></button>
+        <div class="tbody">${players.filter(p => p.team === i).map(p => `<span style="display:flex;align-items:center;gap:8px;font-size:14px">${av(p.name, p.color, '', p.av)}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</span>${p.id === r.host ? '<span class="stamp ink" style="font-size:10px;padding:1px 4px">HOST</span>' : ''}${host && p.id !== uid ? `<button class="btn sm" style="min-height:30px;padding:0 6px" data-act="movePlayer" data-id="${esc(p.id)}" data-i="${1 - i}" aria-label="Na2alo">⇄</button>` : ''}</span>`).join('') || '<span class="note">Fadi</span>'}</div>
       </div>`).join('')}</div>
-    ${unassigned.map(p => `<div class="card" style="border-style:dashed;display:flex;align-items:center;gap:10px;padding:10px 12px">${av(p.name, p.color)}<span style="flex:1;font-size:14px"><b>${esc(p.name)}</b> men gher fare2</span>
+    ${unassigned.map(p => `<div class="card" style="border-style:dashed;display:flex;align-items:center;gap:10px;padding:10px 12px">${av(p.name, p.color, '', p.av)}<span style="flex:1;font-size:14px"><b>${esc(p.name)}</b> men gher fare2</span>
       ${host || p.id === uid ? r.teams.map((t, i) => `<button class="btn sm" style="background:${t.color};color:${onColor(t.color)}" data-act="movePlayer" data-id="${esc(p.id)}" data-i="${i}">→ ${esc(t.name)}</button>`).join('') : ''}</div>`).join('')}
     <p class="note center">${esc(roomSummary(r.settings))}</p>
   </div>
@@ -307,6 +312,16 @@ function qrSvg(text) {
 }
 
 // ----- game -----
+// Prefer titles not shown in recent games, so the defaults don't repeat every game.
+function freshSug(pool, n) {
+  const seen = load('mk_seen', []), set = new Set(seen);
+  const fresh = pool.filter(t => !set.has(t.id));
+  const out = E.suggestions(fresh.length >= n ? fresh : pool, n);
+  const ids = new Set(out.map(t => t.id));
+  save('mk_seen', seen.filter(id => !ids.has(id)).concat([...ids]).slice(-200));
+  return out;
+}
+function pav(p) { return (p && p.av) || (S.room && S.room.players && S.room.players[p.id] && S.room.players[p.id].av) || ''; }
 function G() { return S.mode === 'online' ? (S.room && S.room.game) : S.game; }
 function myTeam() {
   const g = G(); if (!g) return -1;
@@ -330,7 +345,7 @@ SCREENS.game = () => {
 };
 
 function scoreStrip(g) {
-  return `<div class="scorebar">${g.teams.map((t, i) => `<div class="s" style="${g.turn && g.turn.team === i && g.phase !== 'over' ? 'box-shadow:3px 3px 0 ' + t.color : ''}"><span class="dot" style="background:${t.color}"></span>${esc(t.name)}<b>${t.score}</b></div>`).join('')}</div>`;
+  return `<div class="scorebar">${g.teams.map((t, i) => `<div class="s" style="${g.turn && g.turn.team === i && g.phase !== 'over' ? 'box-shadow:3px 3px 0 ' + t.color : ''}">${teamBadge(t.icon, t.color, 'sm')}${esc(t.name)}<b>${t.score}</b></div>`).join('')}</div>`;
 }
 function gameTop(g, label) {
   return `<div class="top" style="padding-bottom:0">
@@ -345,7 +360,7 @@ function gChooseActor(g) {
   return `<div class="screen">${gameTop(g)}<div class="body">
     ${scoreStrip(g)}
     <div class="poster" style="padding:20px 16px"><span class="stamp">Dor ${esc(t.name)}</span><span class="big" style="font-size:36px;text-shadow:3px 3px 0 var(--ink)">MEEN HAYEMASSEL?</span></div>
-    ${mine ? `<div class="card list">${t.players.map(p => `<button class="row" style="width:100%;border:none;background:none;text-align:left" data-act="chooseActor" data-id="${esc(p.id)}">${av(p.name, t.color)}<span class="grow"><b>${esc(p.name)}</b><span class="sub">${g.history.filter(h => h.actorId === p.id).length} adwar</span></span>${I.back.replace('M15 18l-6-6 6-6', 'M9 6l6 6-6 6')}</button>`).join('')}</div>`
+    ${mine ? `<div class="card list">${t.players.map(p => `<button class="row" style="width:100%;border:none;background:none;text-align:left" data-act="chooseActor" data-id="${esc(p.id)}">${av(p.name, t.color, '', pav(p))}<span class="grow"><b>${esc(p.name)}</b><span class="sub">${g.history.filter(h => h.actorId === p.id).length} adwar</span></span>${I.back.replace('M15 18l-6-6 6-6', 'M9 6l6 6-6 6')}</button>`).join('')}</div>`
       : `<p class="note center">Fare2 ${esc(t.name)} beyekhtaro meen hayemassel…</p>`}
   </div></div>`;
 }
@@ -354,7 +369,7 @@ function ensurePick(g) {
   const key = `${g.startedAt}:${g.turnNo}:${g.turn.skips}`;
   if (!S.pick || S.pick.key !== key) {
     const pool = E.filterPool(TITLES, g.settings, g.used);
-    S.pick = { key, sel: null, sug: E.suggestions(pool, 4), q: '', type: 'all', custom: '', showCustom: false };
+    S.pick = { key, sel: null, sug: freshSug(pool, 4), q: '', type: 'all', custom: '', showCustom: false };
   }
   return S.pick;
 }
@@ -479,7 +494,7 @@ function gActing(g) {
       <button class="sa7" data-act="correct">SA7! +${g.settings.points}</button>
       <div class="grid2">
         ${g.settings.skipOn ? `<button class="btn ghost" data-act="skip">Skip −${g.settings.skipCost}</button>` : '<span></span>'}
-        <button class="btn must" data-act="foulAsk">Faul! Etkallem</button>
+        ${local ? '<button class="btn must" data-act="foulAsk">Faul! Etkallem</button>' : '<span></span>'}
       </div>
     </div>
   </div></div>`;
@@ -497,7 +512,7 @@ function gGuess(g) {
   const words = g.turn.title.t.trim().split(/\s+/);
   const tot = g.settings.turnSec * 1000;
   return `<div class="screen"><div class="body">
-    <div class="hrow" style="align-items:center"><span style="display:flex;align-items:center;gap:8px;font:600 14px var(--body)">${av(m.name, g.teams[g.turn.team].color)}${esc(m.name)} · ${esc(g.teams[g.turn.team].name)}</span>
+    <div class="hrow" style="align-items:center"><span style="display:flex;align-items:center;gap:8px;font:600 14px var(--body)">${av(m.name, g.teams[g.turn.team].color, '', m.av)}${esc(m.name)} · ${esc(g.teams[g.turn.team].name)}</span>
       <span data-timer style="font:400 30px var(--display);color:var(--red)">${fmt(E.timeLeft(g))}</span></div>
     <div class="bar"><i data-bar style="width:${(E.timeLeft(g) / tot) * 100}%"></i></div>
     <div class="card shadow" style="border-width:3px;border-radius:20px;padding:16px;display:flex;flex-direction:column;gap:10px">
@@ -505,7 +520,7 @@ function gGuess(g) {
       <div class="hidden-title">${words.map(w => `<span style="width:${Math.min(140, 26 + w.length * 16)}px"></span>`).join('')}</div>
       ${revealedHints(g)}
     </div>
-    ${g.settings.helps.length && g.settings.maxHelps ? `<div class="hrow"><span class="h" style="font-size:16px">Etlob mosa3da · −${g.settings.helpCost}</span><span class="note">${g.turn.helps.length} men ${g.settings.maxHelps}</span></div>
+    ${g.settings.helps.length && g.settings.maxHelps ? `<div class="hrow"><span class="h" style="font-size:16px">Etlob mosa3da · −${g.settings.helpCost}</span><span class="note">Fadel ${left}</span></div>
     <div class="grid3 light">${helps.filter(h => !h.used).map(h => `<button class="helpbtn" ${!h.value || !left ? 'disabled' : ''} data-act="useHelp" data-v="${h.id}">${h.label}</button>`).join('') || '<span class="note">Kollaha est5demet</span>'}</div>` : ''}
     <span class="h" style="font-size:16px">Esharat el aflam</span>
     ${signsGrid()}
@@ -524,7 +539,6 @@ function gOpp(g) {
     <p class="note">Ra2bo ${esc(actor.name)}: law etkallem aw 2al kelma, dousso Faul.</p>
     <div style="margin-top:auto;display:flex;flex-direction:column;gap:10px">
       <button class="btn must cta" data-act="foulAsk">FAUL! ETKALLEM</button>
-      <button class="btn green" data-act="correct">Sa7 — 3erfooha</button>
     </div>
   </div></div>`;
 }
@@ -567,7 +581,7 @@ function gOver(g) {
   const aw = E.awards(g);
   const w = g.winner;
   const order = w === 1 ? [1, 0] : [0, 1];
-  const heights = w === -1 ? [170, 170] : [186, 140];
+  const heights = w === -1 ? [200, 200] : [218, 172];
   const label = { score: `Awel ${g.settings.score} no2ta`, rounds: `${g.settings.rounds} adwar`, time: `${g.settings.minutes} d2ee2a`, manual: 'Wa2afnaha' }[g.settings.endType];
   const host = S.mode === 'local' || (S.room && S.room.host === myId());
   return `<div class="screen"><div class="body">
@@ -576,7 +590,7 @@ function gOver(g) {
       <span style="font:400 42px/1 var(--display);text-align:center">${w === -1 ? 'TA3ADOL!' : esc(g.teams[w].name).toUpperCase() + ' KESBO!'}</span>
       <div class="podium">${order.map((ti, k) => {
         const t = g.teams[ti];
-        return `<div class="col" style="height:${heights[k]}px;background:${t.color};color:${onColor(t.color)}">${k === 0 && w !== -1 ? `<span style="width:26px;height:26px;display:flex">${I.crown}</span>` : ''}<span class="n" style="${onColor(t.color) === '#1F1410' ? 'text-shadow:none' : ''}">${t.score}</span><span class="nm">${esc(t.name)}</span></div>`;
+        return `<div class="col" style="height:${heights[k]}px;background:${t.color};color:${onColor(t.color)}">${k === 0 && w !== -1 ? `<span style="width:26px;height:26px;display:flex">${I.crown}</span>` : ''}${teamBadge(t.icon, t.color, 'lg')}<span class="n" style="${onColor(t.color) === '#1F1410' ? 'text-shadow:none' : ''}">${t.score}</span><span class="nm">${esc(t.name)}</span></div>`;
       }).join('')}</div>
     </div>
     <span class="h">Gawayez el leila</span>
@@ -605,7 +619,8 @@ SCREENS.profile = () => {
   if (!u) {
     return `<div class="screen">${top('El profile', 'home')}<div class="body">
       <div class="card shadow" style="border-width:3px;border-radius:20px;background:var(--teal);color:var(--cream);padding:16px;display:flex;align-items:center;gap:14px">
-        ${av(m ? m.name : '?', m ? m.color : '#6B5444', 'lg')}<div style="flex:1"><span style="font:400 28px/1 var(--display)">${esc(m ? m.name : 'Guest').toUpperCase()}</span><br><span style="font:500 13px var(--body)">Guest · el stats mesh betetsagel</span></div></div>
+        <button class="avbtn" style="background:none;border:none;padding:0" data-act="avatarAsk" data-k="me" aria-label="Ghayyar sortak">${av(m ? m.name : '?', m ? m.color : '#6B5444', 'lg', m && m.av)}</button><div style="flex:1"><span style="font:400 28px/1 var(--display)">${esc(m ? m.name : 'Guest').toUpperCase()}</span><br><span style="font:500 13px var(--body)">Guest · el stats mesh betetsagel</span></div></div>
+      ${m ? `<button class="btn" data-act="avatarAsk" data-k="me">Ghayyar sortak</button>` : ''}
       <button class="btn red cta" data-act="login">E3mel 7esab aw da5ol</button>
       ${m ? `<button class="btn" data-act="editGuest">Ghayyar esmak aw lonak</button>` : ''}
       ${prefsCard(p)}
@@ -616,7 +631,7 @@ SCREENS.profile = () => {
   const avg = st.actedCorrect ? Math.round(st.actSecs / st.actedCorrect) : 0;
   return `<div class="screen">${top('El profile', 'home', `<button class="btn sm" data-act="signOut">5orog</button>`)}<div class="body">
     <div class="card shadow" style="border-width:3px;border-radius:20px;background:var(--teal);color:var(--cream);padding:16px;display:flex;align-items:center;gap:14px">
-      ${av(u.name, u.color, 'lg')}
+      <button class="avbtn" style="background:none;border:none;padding:0" data-act="avatarAsk" data-k="me" aria-label="Ghayyar sortak">${av(u.name, u.color, 'lg', u.av)}</button>
       <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
         <span style="font:400 28px/1 var(--display)">${esc(u.name).toUpperCase()}</span>
         <span style="font:500 13px var(--body)">@${esc(u.username || '')}</span>
@@ -627,7 +642,7 @@ SCREENS.profile = () => {
       <div class="field"><label for="p-name">Esmak</label><input id="p-name" class="input" maxlength="16" value="${esc(S.ui.pname ?? u.name)}" data-model="ui.pname"></div>
       ${swatches('ui.pcolor', S.ui.pcolor || u.color)}
       <button class="btn must" data-act="saveProfile">Save</button></div>`
-      : `<button class="btn" data-act="editProfile">${I.pencil.replace('<svg', '<svg width="16" height="16"')} Ghayyar el esm aw el lon</button>`}
+      : `<button class="btn" data-act="avatarAsk" data-k="me">Ghayyar sortak</button><button class="btn" data-act="editProfile">${I.pencil.replace('<svg', '<svg width="16" height="16"')} Ghayyar el esm aw el lon</button>`}
     <span class="h">El arqam</span>
     <div class="grid3">
       <div class="stat"><b>${st.games || 0}</b><span>Le3ba</span></div>
@@ -655,7 +670,6 @@ function badge(ic, txt, on) {
 function prefsCard(p) {
   return `<div class="card list">
     <div class="opt"><span>Sot</span><button class="tog ${p.sound ? 'on' : ''}" role="switch" aria-checked="${p.sound}" data-act="pref" data-k="sound" aria-label="Sot"></button></div>
-    <div class="opt"><span>Hazzaz <span class="note">(Android)</span></span><button class="tog ${p.vibrate ? 'on' : ''}" role="switch" aria-checked="${p.vibrate}" data-act="pref" data-k="vibrate" aria-label="Hazzaz"></button></div>
   </div>`;
 }
 
@@ -675,13 +689,13 @@ SCREENS.friends = () => {
       <button class="btn ink" data-act="findFriend">Dawwar</button>
     </div>
     ${F.msg ? `<p class="note">${esc(F.msg)}</p>` : ''}
-    ${F.found ? `<div class="card row">${av(F.found.name, F.found.color)}<span class="grow"><b>${esc(F.found.name)}</b><span class="sub">@${esc(F.found.username)}</span></span><button class="btn must sm" data-act="addFriend" data-id="${esc(F.found.uid)}">Zawwed</button></div>` : ''}
-    ${reqs.length ? `<span class="h">Talabat (${reqs.length})</span><div class="card list">${reqs.map(f => { const p = P(other(f)); return `<div class="row">${av(p.name, p.color)}<span class="grow"><b>${esc(p.name)}</b><span class="sub">@${esc(p.username || '')}</span></span>
+    ${F.found ? `<div class="card row">${av(F.found.name, F.found.color, '', F.found.av)}<span class="grow"><b>${esc(F.found.name)}</b><span class="sub">@${esc(F.found.username)}</span></span><button class="btn must sm" data-act="addFriend" data-id="${esc(F.found.uid)}">Zawwed</button></div>` : ''}
+    ${reqs.length ? `<span class="h">Talabat (${reqs.length})</span><div class="card list">${reqs.map(f => { const p = P(other(f)); return `<div class="row">${av(p.name, p.color, '', p.av)}<span class="grow"><b>${esc(p.name)}</b><span class="sub">@${esc(p.username || '')}</span></span>
       <button class="iconbtn" style="border-radius:10px;background:var(--green);color:var(--cream);width:40px;height:40px" data-act="acceptFriend" data-id="${f.id}" aria-label="Ewafe2">${I.check}</button>
       <button class="iconbtn" style="border-radius:10px;width:40px;height:40px" data-act="removeFriend" data-id="${f.id}" aria-label="Arfod">${I.x}</button></div>`; }).join('')}</div>` : ''}
     <span class="h">So7abak (${fr.length})</span>
     <div class="card list">${fr.map(f => { const id = other(f), p = P(id), on = online(p); return `<div class="row">
-      <span style="position:relative">${av(p.name, p.color)}${on ? '<span style="position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border-radius:50%;background:var(--green);border:2px solid var(--cream)"></span>' : ''}</span>
+      <span style="position:relative">${av(p.name, p.color, '', p.av)}${on ? '<span style="position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;border-radius:50%;background:var(--green);border:2px solid var(--cream)"></span>' : ''}</span>
       <span class="grow"><b>${esc(p.name)}</b><span class="sub" style="${on ? 'color:var(--green-ink)' : ''}">${on ? (p.room ? 'Online · fe oda ' + esc(p.room) : 'Online') : 'Mesh mawgood'}</span></span>
       ${S.roomCode && S.room ? `<button class="btn must sm" data-act="invite" data-id="${esc(id)}">E3zemo</button>` : on && p.room ? `<button class="btn teal sm" data-act="joinCode" data-v="${esc(p.room)}">Od5ol</button>` : ''}
     </div>`; }).join('') || '<div class="row note">Lessa mafeesh so7ab — dawwar bel username.</div>'}</div>
@@ -702,6 +716,32 @@ function overlays() {
       <div class="card"><div class="val ${arabic ? '' : 'lat'}">${esc(val)}</div></div>
       <p style="margin:0;font:600 15px var(--body)">Laff el telefon le fare2ak — el 3onwan mestakhabba</p>
       <button class="btn ink cta" data-act="closeReveal">Rage3 lel 3onwan</button></div>`;
+  }
+  if (S.ui.sheet === 'avatar') {
+    const cur = currentAvatar();
+    h += `<div class="overlay" data-act="closeSheet"><div class="sheet" data-stop>
+      <div class="hrow"><span class="h">${S.ui.avTarget && S.ui.avTarget.k === 'player' ? 'Sora ' + esc(S.ui.avTarget.name || '') : 'Sortak'}</span><button class="iconbtn" data-act="closeSheet" aria-label="E2fel">${I.x}</button></div>
+      ${S.ui.avBusy ? `<div class="card pad center" style="font-weight:600">Bene2ta3 el wesh men el sora… <span class="note">(sanya aw etnein)</span></div>` : `
+      <div class="avgrid">
+        <label class="avopt up">${cur && cur.startsWith('data:') ? avatarInner(cur, 'x') : `${I.phone.replace('<svg', '<svg width="22" height="22"')}`}<span>Nazzel sora</span><input type="file" accept="image/*" data-avfile="1" aria-label="Nazzel sora"></label>
+        ${HEADS.map(hd => `<button class="avopt ${cur === hd ? 'on' : ''}" data-act="avatarSet" data-v="${hd}" aria-label="Wesh">${avatarInner(hd, hd)}</button>`).join('')}
+      </div>
+      <p class="note">Sora wa7da wesh wa7ed, nour kowayes w 5alfeya basita. El sora mabtetla3sh men el telefon — beyet2ess hena.</p>`}
+    </div></div>`;
+  }
+  if (S.ui.sheet === 'install') {
+    const url = location.origin + location.pathname + '?install=1', qr = qrSvg(url), ios = isIOS();
+    h += `<div class="overlay" data-act="closeSheet"><div class="sheet" data-stop>
+      <div class="hrow"><span class="h">Nazzel el app</span><button class="iconbtn" data-act="closeSheet" aria-label="E2fel">${I.x}</button></div>
+      ${ios ? '' : (qr ? `<div class="qr" role="img" aria-label="QR code el app">${qr}</div><p class="note center">Scan men camera el iPhone — hayefta7 el le3ba fe Safari.</p>` : '')}
+      <div class="card list">
+        <div class="row"><b>1</b><span class="grow">Efta7 el link fe <b>Safari</b></span></div>
+        <div class="row"><b>2</b><span class="grow">Dous zorar <b>Share</b> (el morabba3 bel sahm)</span></div>
+        <div class="row"><b>3</b><span class="grow">E5tar <b>Add to Home Screen</b> → Add</span></div>
+      </div>
+      <p class="note">El iPhone mabyesma7sh le ay website yenazzel nafso automatic — lazem el 3 5atawat dol marra wa7da bas.</p>
+      ${ios ? '' : '<p class="note">Android/Chrome: men el menu e5tar Install app.</p>'}
+    </div></div>`;
   }
   if (S.ui.sheet === 'signs') {
     h += `<div class="overlay" data-act="closeSheet"><div class="sheet" data-stop>
@@ -847,7 +887,7 @@ A.editGuest = () => { S.ui.loginTab = 'guest'; S.ui.gname = S.guest && S.guest.n
 A.guestGo = () => {
   const name = (S.ui.gname || '').trim();
   if (!name) { S.ui.err = 'Ekteb esmak.'; return render(); }
-  S.guest = { name, color: S.ui.color || COLORS[0] };
+  S.guest = { name, color: S.ui.color || COLORS[0], av: S.ui.gav || (S.guest && S.guest.av) || randomHead() };
   save('mk_guest', S.guest);
   afterLogin();
 };
@@ -906,7 +946,7 @@ A.teamColor = d => { S.setup.teams[d.i].color = d.v; render(); };
 A.addPlayer = d => {
   const i = Number(d.i), name = (S.setup.add[i] || '').trim();
   if (!name) return;
-  S.setup.teams[i].players.push({ id: 'p' + uid8(), name });
+  S.setup.teams[i].players.push({ id: 'p' + uid8(), name, av: randomHead() });
   S.setup.add[i] = '';
   render();
   const el = document.getElementById('add' + i); if (el) el.focus();
@@ -923,7 +963,7 @@ A.startSetup = async () => {
   const st = S.setup, s = st.settings;
   st.teams.forEach((t, i) => { t.name = (t.name || '').trim() || (i ? 'El Nesr' : 'El Asad'); });
   if (E.filterPool(TITLES, s).length < 4) { S.ui.err = 'El e5tiyarat di feha 3anaween olayela — zawwed anwa3 aw azmena.'; return render(); }
-  save('mk_setup', { settings: s, teams: st.teams.map(t => ({ name: t.name, color: t.color, players: st.online ? [] : t.players })) });
+  save('mk_setup', { settings: s, teams: st.teams.map(t => ({ name: t.name, color: t.color, icon: t.icon, players: st.online ? [] : t.players })) });
   if (!st.online) {
     if (st.teams.some(t => !t.players.length)) { S.ui.err = 'Kol fare2 me7tag la3eb wa7ed 3al a2al.'; return render(); }
     S.mode = 'local';
@@ -941,7 +981,7 @@ A.startSetup = async () => {
 A.pickType = d => { S.pick.type = d.v; render(); };
 A.reshuffle = () => {
   const g = G(); const pool = E.filterPool(TITLES, g.settings, g.used);
-  S.pick.sug = E.suggestions(pool, 4); S.pick.sel = null; S.pick.q = ''; sfx.tap(); render();
+  S.pick.sug = freshSug(pool, 4); S.pick.sel = null; S.pick.q = ''; sfx.tap(); render();
 };
 A.selTitle = d => {
   const t = TITLES.find(x => x.id === d.id) || (S.pick.sel && S.pick.sel.id === d.id ? S.pick.sel : null);
@@ -971,7 +1011,7 @@ A.skip = () => {
   const pool = E.filterPool(TITLES, g.settings, g.used.concat([g.turn.title.id]));
   if (!pool.length) return toast('Mafeesh 3anaween tanya');
   S.ui.shake = true; setTimeout(() => { S.ui.shake = false; }, 500);
-  act({ type: 'skip', title: E.suggestions(pool, 1)[0] });
+  act({ type: 'skip', title: freshSug(pool, 1)[0] });
 };
 A.foulAsk = () => { S.ui.sheet = 'foul'; render(); };
 A.foul = () => { S.ui.sheet = null; act({ type: 'foul', by: S.mode === 'online' ? myId() : null }); };
@@ -1017,8 +1057,8 @@ async function createOnlineRoom(st) {
       try {
         await C.createRoom(c, {
           code: c, host: uid, status: 'lobby', createdAt: Date.now(), updatedAt: Date.now(),
-          settings: st.settings, teams: st.teams.map(t => ({ name: t.name, color: t.color })),
-          players: { [uid]: { name: m.name, color: m.color, team: 0, at: Date.now() } }, game: null,
+          settings: st.settings, teams: st.teams.map(t => ({ name: t.name, color: t.color, icon: t.icon || '' })),
+          players: { [uid]: { name: m.name, color: m.color, av: m.av || '', team: 0, at: Date.now() } }, game: null,
         });
         code = c;
       } catch (e) { if (e.message !== 'taken') throw e; }
@@ -1074,9 +1114,9 @@ async function joinRoom(raw) {
     const uid = await ensureAuthUid();
     const m = me();
     await C.roomTx(code, room => {
-      if (room.players && room.players[uid]) return { ...room, players: { ...room.players, [uid]: { ...room.players[uid], name: m.name, color: m.color } } };
+      if (room.players && room.players[uid]) return { ...room, players: { ...room.players, [uid]: { ...room.players[uid], name: m.name, color: m.color, av: m.av || '' } } };
       if (room.status !== 'lobby') throw new Error('El le3ba bada2et — estanna lamma te5las.');
-      return { ...room, players: { ...room.players, [uid]: { name: m.name, color: m.color, team: null, at: Date.now() } }, updatedAt: Date.now() };
+      return { ...room, players: { ...room.players, [uid]: { name: m.name, color: m.color, av: m.av || '', team: null, at: Date.now() } }, updatedAt: Date.now() };
     });
     S.joinCode = '';
     openRoom(code);
@@ -1138,6 +1178,49 @@ A.invite = async d => {
   try { await C.sendInvite(d.id, { code: S.roomCode, fromUid: S.user.uid, fromName: S.user.name }); toast('Ba3atna el da3wa.'); }
   catch (e) { toast(C.friendlyError(e)); }
 };
+function standalone() { return matchMedia('(display-mode: standalone)').matches || navigator.standalone === true; }
+function isIOS() { return /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function currentAvatar() {
+  const t = S.ui.avTarget || {};
+  if (t.k === 'player') { const pl = S.setup && S.setup.teams[t.i].players.find(p => p.id === t.id); return pl ? pl.av : ''; }
+  const m = me(); return S.ui.gav || (m && m.av) || '';
+}
+async function setAvatar(a) {
+  const t = S.ui.avTarget || {};
+  if (t.k === 'player') {
+    const pl = S.setup && S.setup.teams[t.i].players.find(p => p.id === t.id); if (pl) pl.av = a;
+  } else if (S.user) {
+    S.user.av = a;
+    try { await C.updatePlayer(S.user.uid, { av: a }); } catch (e) { toast(C.friendlyError(e)); }
+  } else if (S.guest && S.screen !== 'login') { S.guest.av = a; save('mk_guest', S.guest); }
+  else S.ui.gav = a;
+  if (t.k !== 'player' && S.room && S.roomCode && S.room.players && S.room.players[myId()]) roomUpdate(room => { room.players[myId()].av = a; return room; });
+  if (t.k !== 'player' && S.setup) S.setup.teams.forEach(tm => tm.players.forEach(p => { if (p.me) p.av = a; }));
+}
+A.avatarAsk = d => {
+  let name = '';
+  if (d.k === 'player') { const pl = S.setup.teams[d.i].players.find(p => p.id === d.id); name = pl ? pl.name : ''; }
+  S.ui.avTarget = { k: d.k, i: Number(d.i), id: d.id, name }; S.ui.avBusy = false; S.ui.sheet = 'avatar'; render();
+};
+A.avatarSet = async d => { await setAvatar(d.v); S.ui.sheet = null; sfx.tap(); render(); };
+A.teamIcon = d => { S.setup.teams[d.i].icon = d.v; sfx.tap(); render(); };
+async function onAvatarFile(file) {
+  if (!file) return;
+  S.ui.avBusy = true; render();
+  try {
+    const r = await makeSticker(file);
+    await setAvatar(r.av);
+    if (!r.cut) toast('Ma3refnash ne2ta3 el wesh bezabt — 7atena el sora metgahhaza.');
+    S.ui.sheet = null;
+  } catch (e) { toast(e.message || 'El sora ma2ateletsh.'); }
+  S.ui.avBusy = false; render();
+}
+async function onTeamFile(i, file) {
+  if (!file || !S.setup) return;
+  try { S.setup.teams[i].icon = await teamPhoto(file); } catch (e) { toast(e.message); }
+  render();
+}
+A.installApp = () => { S.ui.sheet = 'install'; render(); };
 A.shareApp = async () => {
   const text = 'Ta3ala el3ab Matetkallemsh — le3bet el aflam el masreya!';
   try { if (navigator.share) return await navigator.share({ text, url: location.origin }); } catch { return; }
@@ -1155,6 +1238,7 @@ function setPath(path, value) {
 }
 
 document.addEventListener('click', e => {
+  if (e.target.closest('input[type=file]')) return;
   const el = e.target.closest('[data-act]');
   if (!el) return;
   if (el.classList.contains('overlay') && e.target.closest('[data-stop]')) return;
@@ -1174,6 +1258,8 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.tagName === 'SELECT' && el.dataset.model) { setPath(el.dataset.model, el.value); render(); }
+  if (el.dataset && el.dataset.avfile) onAvatarFile(el.files && el.files[0]);
+  if (el.dataset && el.dataset.teamfile != null) onTeamFile(Number(el.dataset.teamfile), el.files && el.files[0]);
 });
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
@@ -1218,6 +1304,7 @@ async function boot() {
   const params = new URLSearchParams(location.search);
   const roomParam = (params.get('room') || '').toUpperCase();
   if (roomParam) history.replaceState(null, '', location.pathname);
+  if (params.has('install')) { history.replaceState(null, '', location.pathname); if (!standalone()) S.ui.sheet = 'install'; }
 
   let authResolved = Promise.resolve();
   try {
@@ -1231,7 +1318,7 @@ async function boot() {
         if (u && !u.isAnonymous) {
           let p = null;
           try { p = await C.getPlayer(u.uid); } catch {}
-          S.user = { uid: u.uid, email: u.email, name: (p && p.name) || u.displayName || 'La3eb', color: (p && p.color) || COLORS[0], username: p && p.username, stats: p && p.stats, account: true };
+          S.user = { uid: u.uid, email: u.email, name: (p && p.name) || u.displayName || 'La3eb', color: (p && p.color) || COLORS[0], av: (p && p.av) || '', username: p && p.username, stats: p && p.stats, account: true };
           watchUserData(u.uid);
           if (!first && S.screen === 'login') afterLogin();
         } else {

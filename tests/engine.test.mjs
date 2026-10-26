@@ -56,6 +56,22 @@ test('max helps enforced', () => {
   assert.throws(() => E.apply(g, { type: 'help', helpId: 'letter' }), /Khalast/);
 });
 
+test('unused helps carry over per team', () => {
+  let g = E.newGame({ ...E.defaultSettings(), maxHelps: 2 }, teams(), 0);
+  const play = (helps) => {
+    g = E.apply(g, { type: 'pick', title: titles[0] });
+    g = E.apply(g, { type: 'start', now: 0 });
+    helps.forEach(h => { g = E.apply(g, { type: 'help', helpId: h, now: 1 }); });
+    g = E.apply(g, { type: 'correct', now: 2 });
+    g = E.apply(g, { type: 'next', now: 3 });
+  };
+  play([]);                 // team 0 saves 2
+  play(['genre']);          // team 1 uses 1, keeps 1
+  assert.equal(E.helpsLeft(g), 4);      // team 0: 2 saved + 2 new
+  play(['genre', 'lead', 'letter']);    // team 0 can use 3 now
+  assert.equal(E.helpsLeft(g), 3);      // team 1: 1 left + 2 new
+});
+
 test('skip costs a point and swaps the title', () => {
   let g = E.newGame(E.defaultSettings(), teams(), 0);
   g = E.apply(g, { type: 'pick', title: titles[0] });

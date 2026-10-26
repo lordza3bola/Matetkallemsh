@@ -1,13 +1,13 @@
 // Matetkallemsh service worker.
 // App files: network first (so a new version shows on the next open), cache as offline fallback.
 // Fonts, the QR library and the Firebase SDK: cache first. Firestore/Auth traffic is never touched.
-const CACHE = 'mk-v1';
+const CACHE = 'mk-v3';
 const SHELL = [
   './', './index.html', './manifest.json', './css/app.css',
-  './js/app.js', './js/engine.js', './js/titles.js', './js/cloud.js', './js/fx.js', './js/share.js', './js/icons.js', './js/firebase-config.js',
+  './js/app.js', './js/engine.js', './js/titles.js', './js/cloud.js', './js/fx.js', './js/share.js', './js/icons.js', './js/avatar.js', './js/firebase-config.js',
   './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png', './icons/favicon.png',
 ];
-const STATIC_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'www.gstatic.com'];
+const STATIC_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'www.gstatic.com', 'cdn.jsdelivr.net', 'storage.googleapis.com'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));

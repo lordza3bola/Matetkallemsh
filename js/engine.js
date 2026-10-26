@@ -125,7 +125,7 @@ export function newGame(settings, teams, now = Date.now()) {
   const game = {
     v: 1,
     settings: { ...settings },
-    teams: teams.map(t => ({ name: t.name, color: t.color, players: t.players.map(p => ({ id: p.id, name: p.name })), score: 0, turns: 0, actorIdx: 0 })),
+    teams: teams.map(t => ({ name: t.name, color: t.color, icon: t.icon || '', players: t.players.map(p => (p.av ? { id: p.id, name: p.name, av: p.av } : { id: p.id, name: p.name })), score: 0, turns: 0, actorIdx: 0, bank: 0 })),
     teamTurn: 0,
     turnNo: 1,
     used: [],
@@ -141,6 +141,8 @@ export function newGame(settings, teams, now = Date.now()) {
 function startTurn(game) {
   const g = clone(game);
   const team = g.teams[g.teamTurn];
+  // unused helps carry over: each turn adds maxHelps to the team's own bank
+  team.bank = (team.bank || 0) + (g.settings.maxHelps || 0);
   const actor = g.settings.rotate ? team.players[team.actorIdx % team.players.length] : null;
   g.turn = {
     team: g.teamTurn,
@@ -174,7 +176,7 @@ export function timeLeft(game, now = Date.now()) {
 
 export function helpsLeft(game) {
   if (!game || !game.turn) return 0;
-  return Math.max(0, game.settings.maxHelps - game.turn.helps.length);
+  return Math.max(0, game.teams[game.turn.team].bank || 0);
 }
 
 export function availableHelps(game) {
@@ -223,9 +225,10 @@ export function apply(game, a) {
       need(g.phase === 'acting', 'El dor mesh shaghal');
       need(g.settings.helps.includes(a.helpId), 'El mosa3da di ma2foula');
       need(!t.helps.includes(a.helpId), 'Estakhdemtoha 2abl keda');
-      need(t.helps.length < g.settings.maxHelps, 'Khalast el mosa3dat');
+      need((g.teams[t.team].bank || 0) > 0, 'Khalast el mosa3dat');
       need(helpValue(t.title, a.helpId), 'Mafeesh mosa3da di lel 3onwan da');
       t.helps.push(a.helpId);
+      g.teams[t.team].bank -= 1;
       return g;
     }
     case 'skip': {
