@@ -70,7 +70,8 @@ try:
         # Omar creates a room
         click(A, '.top [data-act=profile]'); click(A, '.top [data-act=home]')
         click(A, '[data-act=newOnline]')
-        A.evaluate("window.__mk.S.setup.settings.score = 2; window.__mk.S.setup.settings.turnSec = 60")
+        A.evaluate("window.__mk.S.setup.settings.score = 2; window.__mk.S.setup.settings.turnSec = 60; Object.assign(window.__mk.S.setup.settings, {types: ['Film'], eras: ['2000s', 'Gedeed'], helps: ['lead']})")
+        A.evaluate("window.__mk.render()")
         click(A, '[data-act=startSetup]')
         wait(A, "window.__mk.S.screen === 'lobby' && !!window.__mk.S.room")
         code = A.evaluate('window.__mk.S.roomCode')
@@ -123,6 +124,12 @@ try:
         click(K, '[data-act=nextTurn]')
         # turn 2: Karim acts, Omar or Nour pick
         wait(A, "window.__mk.S.room.game.phase === 'pick'")
+        # both pickers see the same shared list, and a reroll updates it for both
+        ids = "JSON.stringify([...document.querySelectorAll('[data-act=selTitle]')].map(e => e.dataset.id))"
+        wait(A, "(window.__mk.S.room.game.turn.sug || []).length > 0")
+        wait(C, f"{ids} === {A.evaluate(ids)!r}")
+        before = A.evaluate(ids); click(C, "[data-act=reshuffle]")
+        wait(A, f"{ids} !== {before!r}"); wait(C, f"{ids} === {A.evaluate(ids)!r}")
         click(A, '[data-act=selTitle]'); click(A, '[data-act=confirmPick]')
         wait(K, "window.__mk.S.room.game.phase === 'ready'")
         click(K, '[data-act=startTurn]')

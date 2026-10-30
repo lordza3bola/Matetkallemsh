@@ -49,6 +49,7 @@ try:
         click('[data-act=stepSetting][data-k=score][data-d="-1"]')
         page.evaluate("window.__mk.S.setup.settings.score = 2")
         shot('setup-filled')
+        for sel in ['[data-k=types][data-v=Film]','[data-k=eras][data-v="2000s"]','[data-k=eras][data-v=Gedeed]','[data-k=helps][data-v=lead]']: click(sel)
         click('[data-act=startSetup]')
         state = page.evaluate('window.__mk.S.game.phase')
         assert state == 'pick', state

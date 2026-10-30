@@ -3,7 +3,7 @@ import * as E from './engine.js';
 import { TITLES } from './titles.js';
 import * as C from './cloud.js';
 import { FIREBASE_CONFIG } from './firebase-config.js';
-import { sfx, unlockAudio, confetti, keepAwake, setPrefs, getPrefs } from './fx.js';
+import { sfx, unlockAudio, confetti, keepAwake, setPrefs, getPrefs, startMusic, stopMusic } from './fx.js';
 import { shareGame } from './share.js';
 import { I } from './icons.js';
 import { avatarInner, HEADS, randomHead, teamBadge, TEAM_ICONS, TEAM_DEFAULT, makeSticker, teamPhoto } from './avatar.js';
@@ -186,9 +186,11 @@ function swatches(model, cur) {
 }
 
 // ----- setup -----
+const clampNum = (v, min, max) => Math.max(Number(min), Math.min(Number(max), Math.round(Number(v) || Number(min))));
 function newSetup(online) {
   const last = load('mk_setup');
-  const settings = { ...E.defaultSettings(), ...(last && last.settings) };
+  // Types, eras and helps start empty every time — Fadil picks only what he wants.
+  const settings = { ...E.defaultSettings(), ...(last && last.settings), types: [], eras: [], helps: [] };
   const m = me();
   let teams = last && last.teams ? last.teams : [
     { name: 'El Asad', color: COLORS[0], players: [] },
@@ -204,7 +206,7 @@ function newSetup(online) {
 
 SCREENS.setup = () => {
   const st = S.setup, s = st.settings;
-  const pool = E.filterPool(TITLES, s).length;
+  const pool = E.filterPool(TITLES, s).length, ready = s.types.length && s.eras.length;
   return `<div class="screen">${top('Le3ba gedeeda', 'home')}
   <div class="body">
     <div class="seg">
@@ -221,11 +223,11 @@ SCREENS.setup = () => {
     <span class="h">El zaman · El mostawa</span>
     <div class="chips">${E.ERAS.map(k => `<button class="chip teal ${s.eras.includes(k) ? 'on' : ''}" data-act="toggleArr" data-k="eras" data-v="${k}">${esc(k)}</button>`).join('')}</div>
     <div class="seg must">${['Sahl', 'Wasat', 'Sa3b', 'all'].map(d => `<button class="${s.diff === d ? 'on' : ''}" data-act="setSetting" data-k="diff" data-v="${d}">${d === 'all' ? 'El kol' : d}</button>`).join('')}</div>
-    <p class="note" style="margin-top:-6px">${pool} 3onwan mota7 bel e5tiyarat di</p>
+    <p class="note" style="margin-top:-6px">${ready ? `${pool} 3onwan mota7 bel e5tiyarat di` : 'E5taro no3 wa zaman wa7ed 3al a2al'}</p>
 
     <div class="grid2">
       <div class="field"><span class="h" style="font-size:16px">Wa2t el dor</span>
-        <div class="seg">${[60, 90, 120].map(n => `<button class="${s.turnSec === n ? 'on' : ''}" data-act="setSetting" data-k="turnSec" data-v="${n}" data-num="1">${n}s</button>`).join('')}</div></div>
+        <label class="inrow" style="align-items:center"><input id="turnsec" class="input" type="number" inputmode="numeric" min="15" max="300" step="5" style="height:46px;font-size:18px;text-align:center" value="${s.turnSec}" data-model="setup.settings.turnSec" data-num="1" data-min="15" data-max="300" aria-label="Wa2t el dor bel sawany"><b>sanya</b></label></div>
       <div class="field"><span class="h" style="font-size:16px">Tentehy emta</span>
         <select class="input" style="height:46px;font-size:14px" data-model="setup.settings.endType" aria-label="Tentehy emta">${E.END_TYPES.map(o => `<option value="${o.id}" ${s.endType === o.id ? 'selected' : ''}>${o.label}</option>`).join('')}</select></div>
     </div>
@@ -242,7 +244,7 @@ SCREENS.setup = () => {
     <div class="card opt"><span>A2sa mosa3dat fel dor</span>${stepper('maxHelps', s.maxHelps, 0, 5)}</div>
     ${S.ui.err ? `<div class="err" role="alert">${esc(S.ui.err)}</div>` : ''}
   </div>
-  <div class="foot"><button class="btn red cta" data-act="startSetup" ${S.ui.busy ? 'disabled' : ''}>${st.online ? 'E3mel el oda' : 'Yalla nebda2!'}</button></div>
+  <div class="foot"><button class="btn red cta" data-act="startSetup" ${S.ui.busy || !ready ? 'disabled' : ''}>${st.online ? 'E3mel el oda' : 'Yalla nebda2!'}</button></div>
   </div>`;
 };
 
@@ -371,7 +373,19 @@ function ensurePick(g) {
   const key = `${g.startedAt}:${g.turnNo}:${g.turn.skips}`;
   if (!S.pick || S.pick.key !== key) {
     const pool = E.filterPool(TITLES, g.settings, g.used);
-    S.pick = { key, sel: null, sug: freshSug(pool, 4), q: '', type: 'all', custom: '', showCustom: false };
+    const shared = S.mode === 'online' && g.turn.sug && g.turn.sug.length;
+    S.pick = { key, sel: null, sug: shared ? [] : freshSug(pool, 4), q: '', type: 'all', custom: '', showCustom: false };
+    // Online: the first teammate to open the list shares it with the whole picking team.
+    if (S.mode === 'online' && !shared) act({ type: 'suggest', ids: S.pick.sug.map(t => t.id), ifEmpty: true });
+  }
+  // Online: always show the room's shared list, so every teammate sees (and rerolls) the same titles.
+  if (S.mode === 'online' && g.turn.sug && g.turn.sug.length) {
+    const ids = g.turn.sug.join(',');
+    if (S.pick.sugIds !== ids) {
+      S.pick.sugIds = ids;
+      S.pick.sug = g.turn.sug.map(id => TITLES.find(x => x.id === id)).filter(Boolean);
+      if (S.pick.sel && !S.pick.sel.custom && !g.turn.sug.includes(S.pick.sel.id) && !S.pick.q) S.pick.sel = null;
+    }
   }
   return S.pick;
 }
@@ -857,6 +871,9 @@ function onGameChange() {
   if (prev[0] !== String(g.startedAt)) return; // first load: no sounds
   if (g.phase === 'acting' && prev[2] === 'ready') sfx.clap();
   if (g.phase === 'acting' && prev[2] === 'acting' && prev[3] !== String(t.helps.length)) sfx.help();
+  if (g.phase === 'acting' && prev[2] === 'acting' && prev[4] !== String(t.skips || 0)) sfx.skip();
+  if (g.phase === 'acting' && prev[2] !== 'acting') startMusic();
+  if (g.phase !== 'acting') stopMusic();
   if (g.phase === 'result') {
     const h = g.history[g.history.length - 1];
     ({ correct: sfx.correct, foul: sfx.foul, timeout: sfx.buzzer }[h.result] || (() => {}))();
@@ -960,7 +977,7 @@ A.setupMode = d => {
 A.toggleArr = d => {
   const arr = S.setup.settings[d.k];
   const i = arr.indexOf(d.v);
-  if (i >= 0) { if (arr.length === 1 && d.k !== 'helps') return toast('Lazem wa7ed 3al a2al'); arr.splice(i, 1); } else arr.push(d.v);
+  if (i >= 0) { arr.splice(i, 1); } else arr.push(d.v);
   render();
 };
 A.setSetting = d => { S.setup.settings[d.k] = d.num ? Number(d.v) : d.v; render(); };
@@ -985,10 +1002,12 @@ A.randomTeams = () => {
   if (all.length < 2) return toast('Zawwed la3eeba el awel');
   const [a, b] = E.splitRandom(all);
   S.setup.teams[0].players = a; S.setup.teams[1].players = b;
-  sfx.tap(); render();
+  render();
 };
 A.startSetup = async () => {
   const st = S.setup, s = st.settings;
+  s.turnSec = clampNum(s.turnSec, 15, 300);
+  if (!s.types.length || !s.eras.length) { S.ui.err = 'E5taro no3 wa zaman wa7ed 3al a2al.'; return render(); }
   st.teams.forEach((t, i) => { t.name = (t.name || '').trim() || (i ? 'El Nesr' : 'El Asad'); });
   if (E.filterPool(TITLES, s).length < 4) { S.ui.err = 'El e5tiyarat di feha 3anaween olayela — zawwed anwa3 aw azmena.'; return render(); }
   save('mk_setup', { settings: s, teams: st.teams.map(t => ({ name: t.name, color: t.color, icon: t.icon, players: st.online ? [] : t.players })) });
@@ -1009,7 +1028,10 @@ A.startSetup = async () => {
 A.pickType = d => { S.pick.type = d.v; render(); };
 A.reshuffle = () => {
   const g = G(); const pool = E.filterPool(TITLES, g.settings, g.used);
-  S.pick.sug = freshSug(pool, 4); S.pick.sel = null; S.pick.q = ''; sfx.tap(); render();
+  const sug = freshSug(pool, 4);
+  S.pick.sel = null; S.pick.q = '';
+  if (S.mode === 'online') { act({ type: 'suggest', ids: sug.map(t => t.id) }); return; }
+  S.pick.sug = sug; render();
 };
 A.selTitle = d => {
   const t = TITLES.find(x => x.id === d.id) || (S.pick.sel && S.pick.sel.id === d.id ? S.pick.sel : null);
@@ -1230,8 +1252,8 @@ A.avatarAsk = d => {
   if (d.k === 'player') { const pl = S.setup.teams[d.i].players.find(p => p.id === d.id); name = pl ? pl.name : ''; }
   S.ui.avTarget = { k: d.k, i: Number(d.i), id: d.id, name }; S.ui.avBusy = false; S.ui.sheet = 'avatar'; render();
 };
-A.avatarSet = async d => { await setAvatar(d.v); S.ui.sheet = null; sfx.tap(); render(); };
-A.teamIcon = d => { S.setup.teams[d.i].icon = d.v; sfx.tap(); render(); };
+A.avatarSet = async d => { await setAvatar(d.v); S.ui.sheet = null; render(); };
+A.teamIcon = d => { S.setup.teams[d.i].icon = d.v; render(); };
 async function onAvatarFile(file) {
   if (!file) return;
   S.ui.avBusy = true; render();
@@ -1301,7 +1323,7 @@ A.scanRoom = async () => {
         const r = window.jsQR(x.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: 'dontInvert' });
         if (r && r.data) {
           const code = roomFromText(r.data);
-          if (code) { sfx.tap(); stopScan(); joinRoom(code); return; }
+          if (code) { stopScan(); joinRoom(code); return; }
           if (Date.now() - warned > 3000) { warned = Date.now(); toast('Da mesh QR oda — sawwar el QR elly fel oda.'); }
         }
       }
@@ -1336,6 +1358,7 @@ document.addEventListener('click', e => {
   if (el.classList.contains('overlay') && e.target.closest('[data-stop]')) return;
   e.preventDefault();
   unlockAudio();
+  if (!/^(correct|foul|skip|useHelp|startTurn)$/.test(el.dataset.act)) sfx.tap();
   const fn = A[el.dataset.act];
   if (fn) fn(el.dataset, el);
 });
@@ -1344,12 +1367,14 @@ document.addEventListener('input', e => {
   if (!el.dataset || !el.dataset.model) return;
   let v = el.value;
   if (el.dataset.model === 'joinCode') { v = v.toUpperCase(); el.value = v; }
+  if (el.dataset.num) v = Number(v) || 0;
   setPath(el.dataset.model, v);
   if (el.dataset.live === 'pickList') { const box = $('#pickList'); if (box) box.innerHTML = pickList(G()); }
 });
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.tagName === 'SELECT' && el.dataset.model) { setPath(el.dataset.model, el.value); render(); }
+  if (el.dataset && el.dataset.num && el.dataset.model) { setPath(el.dataset.model, clampNum(el.value, el.dataset.min, el.dataset.max)); render(); }
   if (el.dataset && el.dataset.avfile) onAvatarFile(el.files && el.files[0]);
   if (el.dataset && el.dataset.teamfile != null) onTeamFile(Number(el.dataset.teamfile), el.files && el.files[0]);
 });

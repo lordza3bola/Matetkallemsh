@@ -145,4 +145,15 @@ test('player stats', () => {
   assert.equal(E.playerStats(g, 'karim').wins, 0);
 });
 
+test('shared suggestions: first writer wins, reroll replaces, pick clears', () => {
+  let g = E.newGame(E.defaultSettings(), teams(), 1000);
+  g = E.apply(g, { type: 'suggest', ids: ['a', 'b'], ifEmpty: true });
+  g = E.apply(g, { type: 'suggest', ids: ['c', 'd'], ifEmpty: true });
+  assert.deepEqual(g.turn.sug, ['a', 'b']);
+  g = E.apply(g, { type: 'suggest', ids: ['e', 'f'] });
+  assert.deepEqual(g.turn.sug, ['e', 'f']);
+  g = E.apply(g, { type: 'pick', title: titles[0] });
+  assert.equal(g.turn.sug, undefined);
+});
+
 console.log(`\n${pass} tests passed`);

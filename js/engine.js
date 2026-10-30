@@ -207,10 +207,18 @@ export function apply(game, a) {
       g.phase = 'pick';
       return g;
     }
+    case 'suggest': { // shared title list for the picking team (online); ifEmpty = only the first writer wins
+      need(g.phase === 'pick', 'Mesh wa2t el e5tiyar');
+      need(Array.isArray(a.ids) && a.ids.length, 'Mafeesh 3anaween');
+      if (a.ifEmpty && t.sug && t.sug.length) return game;
+      t.sug = a.ids.map(String).slice(0, 8);
+      return g;
+    }
     case 'pick': {
       need(g.phase === 'pick', 'Mesh wa2t el e5tiyar');
       need(a.title && a.title.t, 'E5taro 3onwan');
       t.title = slimTitle(a.title);
+      delete t.sug;
       g.phase = 'ready';
       return g;
     }
