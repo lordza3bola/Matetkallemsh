@@ -49,8 +49,10 @@ export const TEAM_DEFAULT = ['tarb', 'reel'];
 
 export function teamBadge(icon, color = '#F3B62E', cls = '') {
   const ic = icon || 'reel';
-  const inner = ic.startsWith('data:image') ? `<img src="${ic}" alt=""><i class="ht"></i>` : (TEAM_ICONS[ic] || TEAM_ICONS.reel);
-  return `<span class="tb ${cls} ${ic.startsWith('data:') ? 'photo' : ''}" style="background:${ic.startsWith('data:') ? '#FFF8EA' : color}">${inner}</span>`;
+  // 'data:image/...#gang' = big-head caricature (already a finished stamp); other photos = old halftone look
+  const gang = ic.startsWith('data:image') && ic.endsWith('#gang');
+  const inner = gang ? `<img class="gang" src="${ic.slice(0, -5)}" alt="">` : ic.startsWith('data:image') ? `<img src="${ic}" alt=""><i class="ht"></i>` : (TEAM_ICONS[ic] || TEAM_ICONS.reel);
+  return `<span class="tb ${cls} ${gang ? 'gang' : ic.startsWith('data:') ? 'photo' : ''}" style="background:${ic.startsWith('data:') ? (gang ? color : '#FFF8EA') : color}">${inner}</span>`;
 }
 
 // ---------- image processing ----------
@@ -161,4 +163,110 @@ export async function makeSticker(file) {
   for (let t = 0; t < 360; t += 20) ox.drawImage(white, r * Math.cos(t * Math.PI / 180), r * Math.sin(t * Math.PI / 180));
   ox.drawImage(white, 0, 0); ox.drawImage(head, 0, 0);
   return { av: exportSmall(out), cut: ok };
+}
+
+// ---------- team photo: big-head gang caricature ----------
+// Group photo -> everyone cut out, cartoon look (flat colors + ink outlines), heads blown up 1.6x
+// on their bodies, inside a cinema stamp in the team color. All on the phone.
+export async function teamCaricature(file, color = '#1F5F7A') {
+  const src = scaled(await loadImg(file), 640), W = src.width, H = src.height;
+  const toon = cartoon(src);
+  let art, ok = true;
+  try { art = await bigHeads(src, toon); } catch { ok = false; art = null; }
+  const S = 240, out = canvasOf(S, S), o = out.getContext('2d');
+  o.save(); o.beginPath(); o.arc(S / 2, S / 2, S / 2 - 2, 0, Math.PI * 2); o.fillStyle = color; o.fill(); o.clip();
+  if (art) { // bottom-aligned, people fill the circle
+    const k = Math.min((S * 0.74) / art.width, (S * 0.78) / art.height), w = art.width * k, h = art.height * k;
+    o.drawImage(art, (S - w) / 2, S - h - 6, w, h);
+  } else { // no people found: cartoon of the center crop
+    const s = Math.min(W, H); o.drawImage(toon, (W - s) / 2, (H - s) / 2, s, s, 0, 0, S, S);
+  }
+  o.restore();
+  o.lineWidth = 5; o.strokeStyle = '#1F1410'; o.beginPath(); o.arc(S / 2, S / 2, S / 2 - 3, 0, Math.PI * 2); o.stroke();
+  o.setLineDash([7, 9]); o.lineWidth = 3; o.strokeStyle = '#F3B62E'; o.beginPath(); o.arc(S / 2, S / 2, S / 2 - 14, 0, Math.PI * 2); o.stroke();
+  return { icon: exportSmall(out) + '#gang', cut: ok };
+}
+
+// Flat-color cartoon: smooth, posterize to a few tones, ink edges.
+function cartoon(c) {
+  const W = c.width, H = c.height, x = c.getContext('2d');
+  const sm = canvasOf(W, H), sx = sm.getContext('2d');
+  sx.filter = 'blur(2px) saturate(1.5) contrast(1.15)'; sx.drawImage(c, 0, 0); sx.filter = 'none';
+  const id = sx.getImageData(0, 0, W, H), d = id.data, raw = x.getImageData(0, 0, W, H).data;
+  const L = new Float32Array(W * H);
+  for (let i = 0; i < W * H; i++) L[i] = raw[i * 4] * .3 + raw[i * 4 + 1] * .59 + raw[i * 4 + 2] * .11;
+  const q = v => Math.round(v / 51) * 51; // 6 levels per channel
+  for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
+    const i = y * W + xx, p = i * 4;
+    let e = 0;
+    if (xx > 0 && y > 0 && xx < W - 1 && y < H - 1) {
+      const gx = L[i - W + 1] + 2 * L[i + 1] + L[i + W + 1] - L[i - W - 1] - 2 * L[i - 1] - L[i + W - 1];
+      const gy = L[i + W - 1] + 2 * L[i + W] + L[i + W + 1] - L[i - W - 1] - 2 * L[i - W] - L[i - W + 1];
+      e = Math.sqrt(gx * gx + gy * gy);
+    }
+    if (e > 110) { d[p] = 31; d[p + 1] = 20; d[p + 2] = 16; }
+    else { d[p] = q(d[p]); d[p + 1] = q(d[p + 1]); d[p + 2] = q(d[p + 2]); }
+  }
+  sx.putImageData(id, 0, 0);
+  return sm;
+}
+
+// Cut out all people, enlarge each head 1.6x around its chin, add a white sticker edge.
+async function bigHeads(src, toon) {
+  const seg = await segmenter(), W = src.width, H = src.height;
+  let cats = null, mw = 0, mh = 0;
+  seg.segment(src, r => { const m = r.categoryMask; mw = m.width; mh = m.height; cats = m.getAsUint8Array().slice(); m.close && m.close(); });
+  if (!cats) throw new Error('no mask');
+  const person = blur(Float32Array.from(cats, k => k ? 1 : 0), mw, mh, 1);
+  // label head blobs (hair + face)
+  const lab = new Int32Array(mw * mh), heads = [];
+  for (let i = 0; i < mw * mh; i++) {
+    if (lab[i] || !(cats[i] === 1 || cats[i] === 3)) continue;
+    const id = heads.length + 1, st = [i]; lab[i] = id;
+    let n = 0, x0 = mw, y0 = mh, x1 = 0, y1 = 0;
+    while (st.length) {
+      const j = st.pop(), x = j % mw, y = (j / mw) | 0; n++;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      for (const k of [j - 1, j + 1, j - mw, j + mw]) {
+        if (k < 0 || k >= mw * mh || lab[k] || Math.abs((k % mw) - x) > 1) continue;
+        if (cats[k] === 1 || cats[k] === 3) { lab[k] = id; st.push(k); }
+      }
+    }
+    heads.push({ id, n, box: [x0, y0, x1, y1] });
+  }
+  const big = heads.filter(h => h.n > mw * mh * 0.003);
+  if (!big.length) throw new Error('no heads');
+  const sx = W / mw, sy = H / mh;
+  const masked = (fn) => { // toon pixels where fn(maskIndex) is true
+    const c = canvasOf(W, H), x = c.getContext('2d'); x.drawImage(toon, 0, 0);
+    const id = x.getImageData(0, 0, W, H), d = id.data;
+    for (let y = 0; y < H; y++) for (let xx = 0; xx < W; xx++) {
+      const m = Math.min(mh - 1, (y / sy) | 0) * mw + Math.min(mw - 1, (xx / sx) | 0);
+      d[(y * W + xx) * 4 + 3] = fn(m);
+    }
+    x.putImageData(id, 0, 0); return c;
+  };
+  const body = masked(m => Math.max(0, Math.min(255, (person[m] - 0.3) / 0.4 * 255)));
+  // canvas big enough for grown heads on top
+  const G = 1.6, top = Math.max(...big.map(h => (h.box[3] - h.box[1] + 1) * sy * (G - 1)));
+  const comp = canvasOf(W, H + Math.ceil(top)), cx = comp.getContext('2d');
+  cx.drawImage(body, 0, top);
+  for (const h of big.sort((a, b) => a.box[3] - b.box[3])) { // back row first
+    const layer = masked(m => (lab[m] === h.id ? 255 : 0));
+    const [x0, y0, x1, y1] = h.box, bx = x0 * sx, by = y0 * sy, bw = (x1 - x0 + 1) * sx, bh = (y1 - y0 + 1) * sy;
+    const pad = 4, w = (bw + pad * 2) * G, hh = (bh + pad * 2) * G;
+    cx.drawImage(layer, bx - pad, by - pad, bw + pad * 2, bh + pad * 2, bx + bw / 2 - w / 2, top + by + bh - hh + pad * G, w, hh);
+  }
+  // crop to the people
+  const id = cx.getImageData(0, 0, comp.width, comp.height).data;
+  let X0 = comp.width, Y0 = comp.height, X1 = 0, Y1 = 0;
+  for (let y = 0; y < comp.height; y += 2) for (let x = 0; x < comp.width; x += 2) if (id[(y * comp.width + x) * 4 + 3] > 40) { if (x < X0) X0 = x; if (x > X1) X1 = x; if (y < Y0) Y0 = y; if (y > Y1) Y1 = y; }
+  if (X1 <= X0) throw new Error('empty');
+  const r = 6, cw = X1 - X0 + r * 2 + 2, ch = Y1 - Y0 + r * 2 + 2;
+  const art = canvasOf(cw, ch), ax = art.getContext('2d');
+  const white = canvasOf(cw, ch), wx = white.getContext('2d');
+  wx.drawImage(comp, X0 - r, Y0 - r, cw, ch, 0, 0, cw, ch); wx.globalCompositeOperation = 'source-in'; wx.fillStyle = '#fff'; wx.fillRect(0, 0, cw, ch);
+  for (let t = 0; t < 360; t += 30) ax.drawImage(white, r * Math.cos(t * Math.PI / 180), r * Math.sin(t * Math.PI / 180));
+  ax.drawImage(comp, X0 - r, Y0 - r, cw, ch, 0, 0, cw, ch);
+  return art;
 }

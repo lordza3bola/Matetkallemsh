@@ -6,7 +6,7 @@ import { FIREBASE_CONFIG } from './firebase-config.js';
 import { sfx, unlockAudio, confetti, keepAwake, setPrefs, getPrefs, startMusic, stopMusic } from './fx.js';
 import { shareGame } from './share.js';
 import { I } from './icons.js';
-import { avatarInner, HEADS, randomHead, teamBadge, TEAM_ICONS, TEAM_DEFAULT, makeSticker, teamPhoto } from './avatar.js';
+import { avatarInner, HEADS, randomHead, teamBadge, TEAM_ICONS, TEAM_DEFAULT, makeSticker, teamCaricature } from './avatar.js';
 
 export const APP_VERSION = 'V3';
 
@@ -252,7 +252,7 @@ function teamCard(t, i, st) {
   return `<div class="team" style="box-shadow:3px 3px 0 ${t.color}">
     <div class="tname">${teamBadge(t.icon, t.color, 'sm')}<input id="tname${i}" value="${esc(t.name)}" maxlength="14" data-model="setup.teams.${i}.name" aria-label="Esm el fare2"></div>
     <div class="tbody">
-      <div class="tbrow">${Object.keys(TEAM_ICONS).map(k => `<button class="tb pick ${t.icon === k ? 'on' : ''}" style="background:${t.color}" data-act="teamIcon" data-i="${i}" data-v="${k}" aria-label="Shi3ar el fare2">${TEAM_ICONS[k]}</button>`).join('')}<label class="tb pick up ${t.icon && t.icon.startsWith('data:') ? 'on' : ''}">${t.icon && t.icon.startsWith('data:') ? `<img src="${t.icon}" alt="">` : '+ Sora'}<input type="file" accept="image/*" data-teamfile="${i}" aria-label="Sora lel fare2"></label></div>
+      <div class="tbrow">${Object.keys(TEAM_ICONS).map(k => `<button class="tb pick ${t.icon === k ? 'on' : ''}" style="background:${t.color}" data-act="teamIcon" data-i="${i}" data-v="${k}" aria-label="Shi3ar el fare2">${TEAM_ICONS[k]}</button>`).join('')}<label class="tb pick up ${t.icon && t.icon.startsWith('data:') ? 'on' : ''}">${t.icon && t.icon.startsWith('data:') ? `<img ${t.icon.endsWith('#gang') ? 'class="gang" ' : ''}src="${t.icon.replace(/#gang$/, '')}" alt="">` : '+ Sora'}<input type="file" accept="image/*" data-teamfile="${i}" aria-label="Sora lel fare2"></label></div>
       <div class="swatches">${COLORS.map(c => `<button class="sw ${c === t.color ? 'on' : ''}" style="background:${c}" data-act="teamColor" data-i="${i}" data-v="${c}" aria-label="Lon el fare2"></button>`).join('')}</div>
       ${!st.online ? `
         <div class="chips" style="gap:4px">${t.players.map(p => `<span class="pchip" style="padding-left:2px"><button class="avbtn" data-act="avatarAsk" data-k="player" data-i="${i}" data-id="${esc(p.id)}" aria-label="Sora ${esc(p.name)}">${av(p.name, t.color, '', p.av)}</button>${esc(p.name)}<button data-act="removePlayer" data-i="${i}" data-id="${esc(p.id)}" aria-label="Shil ${esc(p.name)}">×</button></span>`).join('') || '<span class="note">Mafeesh la3eeba lessa</span>'}</div>
@@ -1267,8 +1267,14 @@ async function onAvatarFile(file) {
 }
 async function onTeamFile(i, file) {
   if (!file || !S.setup) return;
-  try { S.setup.teams[i].icon = await teamPhoto(file); } catch (e) { toast(e.message); }
-  render();
+  const t = S.setup.teams[i];
+  S.ui.teamBusy = i; render(); toast('Bnersem el fare2…');
+  try {
+    const r = await teamCaricature(file, t.color);
+    t.icon = r.icon;
+    if (!r.cut) toast('Mala2nash wshoosh wad7a — 3amalna cartoon lel sora kollaha.');
+  } catch (e) { toast(e.message); }
+  S.ui.teamBusy = null; render();
 }
 A.installApp = () => { S.ui.sheet = 'install'; render(); };
 A.doInstall = async () => {
